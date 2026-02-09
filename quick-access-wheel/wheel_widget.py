@@ -26,7 +26,9 @@ UNSET_TEXT_COLOR = QColor(140, 140, 140)
 class WheelWidget(QWidget):
     """A radial 8-segment wheel overlay."""
 
-    slot_selected = pyqtSignal(int)  # emitted with the slot index on selection
+    slot_selected = pyqtSignal(int)  # emitted with the slot index on release
+    slot_clicked = pyqtSignal(int)  # emitted on mouse button click (for editing)
+    folder_hovered = pyqtSignal(int)  # emitted when a folder slot is hovered
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -49,6 +51,12 @@ class WheelWidget(QWidget):
         self._mouse_tracking_timer.timeout.connect(self._track_mouse)
         self._mouse_tracking_timer.setInterval(16)  # ~60fps
 
+        # Folder hover dwell timer — auto-expands after 400ms
+        self._folder_dwell_timer = QTimer(self)
+        self._folder_dwell_timer.setSingleShot(True)
+        self._folder_dwell_timer.setInterval(400)
+        self._folder_dwell_timer.timeout.connect(self._on_folder_dwell)
+
     def show_at_cursor(self):
         pos = QCursor.pos()
         self.move(pos.x() - self.width() // 2, pos.y() - self.height() // 2)
@@ -58,11 +66,17 @@ class WheelWidget(QWidget):
 
     def hide(self):
         self._mouse_tracking_timer.stop()
+        self._folder_dwell_timer.stop()
         selected = self._hovered_slot
         self._hovered_slot = -1
         super().hide()
         if 0 <= selected < NUM_SLOTS:
             self.slot_selected.emit(selected)
+
+    def mousePressEvent(self, event):
+        """Click on a segment to edit it."""
+        if event.button() == Qt.LeftButton and 0 <= self._hovered_slot < NUM_SLOTS:
+            self.slot_clicked.emit(self._hovered_slot)
 
     def set_slots(self, slots):
         self._slots = slots
@@ -77,6 +91,7 @@ class WheelWidget(QWidget):
         if dist < INNER_RADIUS or dist > WHEEL_RADIUS:
             if self._hovered_slot != -1:
                 self._hovered_slot = -1
+                self._folder_dwell_timer.stop()
                 self.update()
             return
 
@@ -87,7 +102,20 @@ class WheelWidget(QWidget):
         slot = int(angle / SEGMENT_ANGLE) % NUM_SLOTS
         if slot != self._hovered_slot:
             self._hovered_slot = slot
+            self._folder_dwell_timer.stop()
+            # Start dwell timer if hovering a folder slot
+            if slot < len(self._slots):
+                slot_data = self._slots[slot]
+                if slot_data.get("type") == "folder":
+                    self._folder_dwell_timer.start()
             self.update()
+
+    def _on_folder_dwell(self):
+        """Called when the mouse has hovered over a folder slot long enough."""
+        if 0 <= self._hovered_slot < NUM_SLOTS:
+            slot_data = self._slots[self._hovered_slot]
+            if slot_data.get("type") == "folder":
+                self.folder_hovered.emit(self._hovered_slot)
 
     def paintEvent(self, event):
         painter = QPainter(self)
