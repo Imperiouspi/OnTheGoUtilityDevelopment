@@ -20,8 +20,11 @@ class QuickAccessWheel:
         self.app = app
         self.config = cfg_mgr.load_config()
         self.folder_stack = []  # list of folder keys; empty = root
+        self._selected_folder = None  # snapshot of folder at time of release
         self.wheel = WheelWidget()
         self.wheel.slot_selected.connect(self._on_slot_selected)
+        self.wheel.slot_clicked.connect(self._configure_slot)
+        self.wheel.folder_hovered.connect(self._on_folder_hovered)
 
         self._setup_hotkey()
         self._setup_tray()
@@ -57,10 +60,13 @@ class QuickAccessWheel:
 
     def _show_wheel(self):
         self.folder_stack = []
+        self._selected_folder = None
         self._refresh_wheel()
         self.wheel.show_at_cursor()
 
     def _hide_wheel(self):
+        # Snapshot which folder we're in before hide triggers slot_selected
+        self._selected_folder = self._current_folder()
         self.wheel.hide()
 
     # ── Wheel data ──────────────────────────────────────────────
@@ -82,9 +88,9 @@ class QuickAccessWheel:
         self.wheel.set_slots(folder["slots"])
         self.wheel.update()
 
-    # ── Slot selection ──────────────────────────────────────────
+    # ── Slot selection (on Super+Alt release) ───────────────────
     def _on_slot_selected(self, index):
-        folder = self._current_folder()
+        folder = self._selected_folder
         if folder is None:
             return
 
@@ -92,25 +98,42 @@ class QuickAccessWheel:
         action_type = slot.get("type")
 
         if action_type is None:
-            # Unconfigured slot — open config dialog
             self._configure_slot(index)
         elif action_type == "back":
+            # back on release just pops (also handled by hover, but keep as safety)
             if self.folder_stack:
                 self.folder_stack.pop()
                 self._refresh_wheel()
         elif action_type == "folder":
+            # Folders auto-expand on hover, so release on a folder is a no-op
+            pass
+        elif action_type == "keystroke":
+            # Delay keystroke so Super+Alt are fully released first
+            value = slot["value"]
+            QTimer.singleShot(150, lambda v=value: execute_keystroke(v))
+        elif action_type == "command":
+            execute_command(slot["value"])
+        elif action_type == "launch":
+            execute_launch(slot["value"])
+
+    # ── Folder hover auto-expand ─────────────────────────────
+    def _on_folder_hovered(self, index):
+        """Auto-expand a folder when hovered for long enough."""
+        folder = self._current_folder()
+        if folder is None:
+            return
+        slot = folder["slots"][index]
+        if slot.get("type") == "folder":
             subfolder_id = slot.get("value")
             if subfolder_id:
                 if subfolder_id not in self.config:
                     cfg_mgr.create_subfolder(self.config, subfolder_id)
                 self.folder_stack.append(subfolder_id)
                 self._refresh_wheel()
-        elif action_type == "keystroke":
-            execute_keystroke(slot["value"])
-        elif action_type == "command":
-            execute_command(slot["value"])
-        elif action_type == "launch":
-            execute_launch(slot["value"])
+        elif slot.get("type") == "back":
+            if self.folder_stack:
+                self.folder_stack.pop()
+                self._refresh_wheel()
 
     def _configure_slot(self, index):
         folder = self._current_folder()
