@@ -1,0 +1,235 @@
+{
+  "settings": {
+    "activation_keys": [
+      "super",
+      "alt"
+    ],
+    "folder_dwell_ms": 400,
+    "wheel_radius": 180,
+    "inner_radius": 50,
+    "bg_opacity": 220,
+    "segment_color": [
+      50,
+      50,
+      55,
+      200
+    ],
+    "hover_color": [
+      80,
+      120,
+      200,
+      200
+    ],
+    "text_color": [
+      220,
+      220,
+      220,
+      255
+    ],
+    "border_color": [
+      100,
+      100,
+      110,
+      180
+    ],
+    "font_size": 9
+  },
+  "root": {
+    "slots": [
+      {
+        "label": "Select to add action",
+        "type": null,
+        "value": null,
+        "icon": null,
+        "icon_type": null,
+        "show_label": true
+      },
+      {
+        "label": "Select to add action",
+        "type": null,
+        "value": null,
+        "icon": null,
+        "icon_type": null,
+        "show_label": true
+      },
+      {
+        "label": "Select to add action",
+        "type": null,
+        "value": null,
+        "icon": null,
+        "icon_type": null,
+        "show_label": true
+      },
+      {
+        "label": "F2",
+        "type": "folder",
+        "value": "folder_91656c23",
+        "icon": null,
+        "icon_type": null,
+        "show_label": true
+      },
+      {
+        "label": "Todoist",
+        "type": "launch",
+        "value": "C:/Users/Noah Cassidy/AppData/Local/Programs/todoist/Todoist.exe",
+        "icon": "C:\\Users\\Noah Cassidy\\Documents\\Code\\OnTheGoUtilityDevelopment\\quick-access-wheel\\icons\\Clover.png",
+        "icon_type": "image",
+        "show_label": false
+      },
+      {
+        "label": "A",
+        "type": "keystroke",
+        "value": "A",
+        "icon": null,
+        "icon_type": null,
+        "show_label": true
+      },
+      {
+        "label": "F1",
+        "type": "folder",
+        "value": "folder_5f44bc19",
+        "icon": "\ud83e\udd37",
+        "icon_type": "emoji",
+        "show_label": false
+      },
+      {
+        "label": "Select to add action",
+        "type": null,
+        "value": null,
+        "icon": null,
+        "icon_type": null,
+        "show_label": true
+      }
+    ]
+  },
+  "folder_5f44bc19": {
+    "slots": [
+      {
+        "label": "Select to add action",
+        "type": null,
+        "value": null,
+        "icon": null,
+        "icon_type": null,
+        "show_label": true
+      },
+      {
+        "label": "Select to add action",
+        "type": null,
+        "value": null,
+        "icon": null,
+        "icon_type": null,
+        "show_label": true
+      },
+      {
+        "label": "Select to add action",
+        "type": null,
+        "value": null,
+        "icon": null,
+        "icon_type": null,
+        "show_label": true
+      },
+      {
+        "label": "Select to add action",
+        "type": null,
+        "value": null,
+        "icon": null,
+        "icon_type": null,
+        "show_label": true
+      },
+      {
+        "label": "Select to add action",
+        "type": null,
+        "value": null,
+        "icon": null,
+        "icon_type": null,
+        "show_label": true
+      },
+      {
+        "label": "Select to add action",
+        "type": null,
+        "value": null,
+        "icon": null,
+        "icon_type": null,
+        "show_label": true
+      },
+      {
+        "label": "Select to add action",
+        "type": null,
+        "value": null,
+        "icon": null,
+        "icon_type": null,
+        "show_label": true
+      },
+      {
+        "label": "Back",
+        "type": "back",
+        "value": null
+      }
+    ]
+  },
+  "folder_91656c23": {
+    "slots": [
+      {
+        "label": "Select to add action",
+        "type": null,
+        "value": null,
+        "icon": null,
+        "icon_type": null,
+        "show_label": true
+      },
+      {
+        "label": "Select to add action",
+        "type": null,
+        "value": null,
+        "icon": null,
+        "icon_type": null,
+        "show_label": true
+      },
+      {
+        "label": "Select to add action",
+        "type": null,
+        "value": null,
+        "icon": null,
+        "icon_type": null,
+        "show_label": true
+      },
+      {
+        "label": "Select to add action",
+        "type": null,
+        "value": null,
+        "icon": null,
+        "icon_type": null,
+        "show_label": true
+      },
+      {
+        "label": "Select to add action",
+        "type": null,
+        "value": null,
+        "icon": null,
+        "icon_type": null,
+        "show_label": true
+      },
+      {
+        "label": "Select to add action",
+        "type": null,
+        "value": null,
+        "icon": null,
+        "icon_type": null,
+        "show_label": true
+      },
+      {
+        "label": "Select to add action",
+        "type": null,
+        "value": null,
+        "icon": null,
+        "icon_type": null,
+        "show_label": true
+      },
+      {
+        "label": "Back",
+        "type": "back",
+        "value": null
+      }
+    ]
+  }
+}
