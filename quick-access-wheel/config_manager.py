@@ -15,15 +15,32 @@ TOP_RIGHT_INDEX = 7
 
 
 def _empty_slot():
-    return {"label": "Select to add action", "type": None, "value": None}
+    return {"label": "Select to add action", "type": None, "value": None,
+            "icon": None, "icon_type": None, "show_label": True}
 
 
 def _back_slot():
     return {"label": "Back", "type": "back", "value": None}
 
 
+def default_settings():
+    return {
+        "activation_keys": ["super", "alt"],
+        "folder_dwell_ms": 400,
+        "wheel_radius": 180,
+        "inner_radius": 50,
+        "bg_opacity": 220,
+        "segment_color": [50, 50, 55, 200],
+        "hover_color": [80, 120, 200, 200],
+        "text_color": [220, 220, 220, 255],
+        "border_color": [100, 100, 110, 180],
+        "font_size": 9,
+    }
+
+
 def default_config():
     return {
+        "settings": default_settings(),
         "root": {
             "slots": [_empty_slot() for _ in range(8)]
         }
@@ -42,6 +59,17 @@ def load_config():
 def save_config(cfg):
     with open(CONFIG_PATH, "w") as f:
         json.dump(cfg, f, indent=2)
+
+
+def get_settings(cfg):
+    """Get settings, filling in defaults for any missing keys."""
+    defaults = default_settings()
+    settings = cfg.get("settings", {})
+    for key, value in defaults.items():
+        if key not in settings:
+            settings[key] = value
+    cfg["settings"] = settings
+    return settings
 
 
 def get_folder(cfg, path):

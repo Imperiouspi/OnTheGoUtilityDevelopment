@@ -13,6 +13,7 @@ from wheel_widget import WheelWidget
 from hotkey_listener import HotkeyThread
 from action_dialog import ActionDialog
 from action_executor import execute_keystroke, execute_command, execute_launch
+from settings_dialog import SettingsDialog
 
 
 class QuickAccessWheel:
@@ -25,9 +26,11 @@ class QuickAccessWheel:
         self.wheel.slot_selected.connect(self._on_slot_selected)
         self.wheel.slot_clicked.connect(self._configure_slot)
         self.wheel.folder_hovered.connect(self._on_folder_hovered)
+        self.wheel.settings_selected.connect(self._open_settings)
 
         self._setup_hotkey()
         self._setup_tray()
+        self._apply_settings()
         self._refresh_wheel()
 
     # ── Tray icon ───────────────────────────────────────────────
@@ -44,12 +47,28 @@ class QuickAccessWheel:
 
         self.tray = QSystemTrayIcon(QIcon(pixmap))
         menu = QMenu()
+        settings_action = QAction("Settings")
+        settings_action.triggered.connect(self._open_settings)
+        menu.addAction(settings_action)
         quit_action = QAction("Quit")
         quit_action.triggered.connect(self._quit)
         menu.addAction(quit_action)
         self.tray.setContextMenu(menu)
         self.tray.setToolTip("Quick Access Wheel (Super+Alt)")
         self.tray.show()
+
+    # ── Settings ─────────────────────────────────────────────────
+    def _apply_settings(self):
+        """Apply current settings to all components."""
+        settings = cfg_mgr.get_settings(self.config)
+        self.wheel.apply_settings(settings)
+
+    def _open_settings(self):
+        """Open the settings dialog."""
+        dialog = SettingsDialog(self.config)
+        if dialog.exec_():
+            self._apply_settings()
+            self._refresh_wheel()
 
     # ── Hotkey ──────────────────────────────────────────────────
     def _setup_hotkey(self):
@@ -153,6 +172,9 @@ class QuickAccessWheel:
                     "label": data["label"],
                     "type": "folder",
                     "value": folder_id,
+                    "icon": data.get("icon"),
+                    "icon_type": data.get("icon_type"),
+                    "show_label": data.get("show_label", True),
                 }
                 cfg_mgr.create_subfolder(self.config, folder_id)
             else:
