@@ -1,0 +1,9 @@
+- centre the settings button icon
+- Use modern styling and potential for future animations
+- Make scaling consistent between resolutions/scaling (and maybe this will fix cutoff bug)
+- Auto use program icon for launch-a-program action.
+- Select colours dialog should never use the current highlight colour for any ui - why does it, for the buttons?
+- Add the ability in settings to create a new layer For any program currently active on screen
+- Switch keystroke action from "press keys" to "select modifiers + type key into box". Have a "?" button so it's clear what to call special keys e.g. space.
+- Add a "reload manual config changes" button to settings, just in case the user changed the config in a text editor
+- Create an exe that can run in the background so I don't have to launch the python file every time.

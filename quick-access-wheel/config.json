@@ -93,9 +93,9 @@
         "show_label": false
       },
       {
-        "label": "Select to add action",
-        "type": null,
-        "value": null,
+        "label": "CMD Pal",
+        "type": "keystroke",
+        "value": "Alt+space",
         "icon": null,
         "icon_type": null,
         "show_label": true

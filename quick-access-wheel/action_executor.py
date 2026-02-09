@@ -12,6 +12,17 @@ _MODIFIER_MAP = {
     "Meta": Key.cmd,
 }
 
+# Map special key names (from config) to pynput Key enum
+_SPECIAL_KEY_MAP = {
+    "space": Key.space,
+    "enter": Key.enter,
+    "return": Key.enter,
+    "tab": Key.tab,
+    "escape": Key.esc,
+    "esc": Key.esc,
+    "backspace": Key.backspace,
+}
+
 
 def _parse_key_sequence(seq_str):
     """Parse a QKeySequence string like 'Ctrl+Shift+A' into pynput keys."""
@@ -25,6 +36,7 @@ def _parse_key_sequence(seq_str):
             modifiers.append(_MODIFIER_MAP[part])
         else:
             key_char = part.lower() if len(part) == 1 else part
+            key_char = _SPECIAL_KEY_MAP.get(key_char.lower() if isinstance(key_char, str) else key_char, key_char)
 
     return modifiers, key_char
 
