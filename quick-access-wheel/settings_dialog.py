@@ -26,7 +26,8 @@ class ColorButton(QPushButton):
     def _update_style(self):
         r, g, b, a = self._color.red(), self._color.green(), self._color.blue(), self._color.alpha()
         self.setStyleSheet(
-            f"background-color: rgba({r},{g},{b},{a}); border: 1px solid #888; border-radius: 3px;"
+            f"QPushButton {{ background-color: rgba({r},{g},{b},{a}); border: 1px solid #888; border-radius: 3px; }}"
+            f"QPushButton:hover {{ background-color: rgba({r},{g},{b},{a}); }}"
         )
 
     def _pick_color(self):

@@ -1,6 +1,6 @@
 import math
 import os
-from PyQt5.QtWidgets import QWidget
+from PyQt5.QtWidgets import QWidget, QApplication
 from PyQt5.QtCore import Qt, QPoint, QRectF, pyqtSignal, QTimer
 from PyQt5.QtGui import (
     QPainter, QColor, QPen, QFont, QFontMetrics, QPainterPath, QCursor,
@@ -53,6 +53,7 @@ class WheelWidget(QWidget):
 
         self._hovered_slot = -1
         self._settings_hovered = False
+        self._centre_slot = None  # folder slot data when inside a folder (label, icon, show_label)
         self._slots = [{"label": "Select to add action", "type": None}] * NUM_SLOTS
         self._suppress_selection = False
         self._mouse_tracking_timer = QTimer(self)
@@ -102,7 +103,15 @@ class WheelWidget(QWidget):
 
     def show_at_cursor(self):
         pos = QCursor.pos()
-        self.move(pos.x() - self.width() // 2, pos.y() - self.height() // 2)
+        x = pos.x() - self.width() // 2
+        y = pos.y() - self.height() // 2
+        # Clamp to the screen that contains the cursor (fixes multi-display)
+        desktop = QApplication.desktop()
+        screen_no = desktop.screenNumber(pos)
+        geom = desktop.availableGeometry(screen_no)
+        x = max(geom.left(), min(x, geom.right() - self.width()))
+        y = max(geom.top(), min(y, geom.bottom() - self.height()))
+        self.move(x, y)
         self.show()
         self.raise_()
         self._settings_hovered = False
@@ -132,6 +141,10 @@ class WheelWidget(QWidget):
 
     def set_slots(self, slots):
         self._slots = slots
+
+    def set_centre_slot(self, slot_data):
+        """Set the slot data shown in the centre (e.g. current folder). None to hide. Uses same icon/label rules as segments."""
+        self._centre_slot = slot_data
 
     def _track_mouse(self):
         global_pos = QCursor.pos()
@@ -200,6 +213,10 @@ class WheelWidget(QWidget):
         painter.setPen(QPen(self._border_color, 1.5))
         painter.drawEllipse(self._center, int(self._inner_radius), int(self._inner_radius))
 
+        # Centre content (current folder: same icon/label rules as segments)
+        if self._centre_slot:
+            self._draw_centre_content(painter)
+
         # Draw settings button
         self._draw_settings_button(painter)
 
@@ -226,6 +243,72 @@ class WheelWidget(QWidget):
         fm = QFontMetrics(gear_font)
         tw = fm.horizontalAdvance(SETTINGS_GEAR)
         painter.drawText(int(cx - tw / 2), int(cy + fm.ascent() / 2 - 1), SETTINGS_GEAR)
+
+    def _draw_centre_content(self, painter):
+        """Draw centre content (current folder) using same icon/label rules as segments."""
+        slot_data = self._centre_slot
+        icon = slot_data.get("icon")
+        icon_type = slot_data.get("icon_type")
+        show_label = slot_data.get("show_label", True)
+        label = slot_data.get("label", "")
+        has_icon = icon and icon_type
+
+        lx = self._center.x()
+        ly = self._center.y()
+        icon_size = 20
+        font = QFont("Sans", max(7, self._font_size - 1))
+        font.setBold(True)
+        painter.setFont(font)
+        fm = QFontMetrics(font)
+        max_width = int((self._inner_radius - 8) * 2)
+
+        lines = []
+        if show_label and label:
+            words = label.split()
+            current = ""
+            for w in words:
+                test = (current + " " + w).strip() if current else w
+                if fm.horizontalAdvance(test) > max_width and current:
+                    lines.append(current)
+                    current = w
+                else:
+                    current = test
+            if current:
+                lines.append(current)
+            lines = lines[:2]
+
+        text_height = len(lines) * fm.height() if lines else 0
+        spacing = 2 if (has_icon and lines) else 0
+        total_height = (icon_size if has_icon else 0) + spacing + text_height
+        top_y = ly - total_height / 2
+
+        if has_icon:
+            if icon_type == "emoji":
+                emoji_font = QFont("Sans", 14)
+                painter.setFont(emoji_font)
+                efm = QFontMetrics(emoji_font)
+                ew = efm.horizontalAdvance(icon)
+                painter.setPen(self._text_color)
+                painter.drawText(int(lx - ew / 2), int(top_y + efm.ascent()), icon)
+                painter.setFont(font)
+            elif icon_type == "image" and os.path.exists(icon):
+                pixmap = QPixmap(icon).scaled(
+                    icon_size, icon_size, Qt.KeepAspectRatio, Qt.SmoothTransformation
+                )
+                painter.drawPixmap(
+                    int(lx - pixmap.width() / 2),
+                    int(top_y),
+                    pixmap
+                )
+            top_y += icon_size + spacing
+
+        if lines:
+            painter.setPen(self._text_color)
+            ty = top_y
+            for line in lines:
+                tw = fm.horizontalAdvance(line)
+                painter.drawText(int(lx - tw / 2), int(ty + fm.ascent()), line)
+                ty += fm.height()
 
     def _draw_segment(self, painter, index):
         start_angle = ANGLE_OFFSET + index * SEGMENT_ANGLE
@@ -263,6 +346,21 @@ class WheelWidget(QWidget):
 
         painter.setPen(QPen(self._border_color, 1.5))
         painter.drawPath(path)
+
+        # Tabbed effect for folder and back segments: extra arcs at the outer edge
+        if slot_type in ("folder", "back"):
+            painter.setBrush(Qt.NoBrush)
+            step = 5
+            for i in (1, 2):
+                r = self._wheel_radius - i * step
+                rect_tab = QRectF(
+                    self._center.x() - r, self._center.y() - r, r * 2, r * 2
+                )
+                painter.drawArc(
+                    rect_tab,
+                    int(-start_angle * 16),
+                    int(-SEGMENT_ANGLE * 16),
+                )
 
         # Draw icon and/or label
         mid_angle_deg = start_angle + SEGMENT_ANGLE / 2

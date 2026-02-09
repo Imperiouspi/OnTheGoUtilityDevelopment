@@ -99,12 +99,27 @@ class QuickAccessWheel:
         path = self._current_folder_path()
         return cfg_mgr.get_folder(self.config, path)
 
+    def _current_folder_slot(self):
+        """Slot data for the folder we're currently viewing (from parent). None at root."""
+        if not self.folder_stack:
+            return None
+        parent_path = self.folder_stack[:-1]
+        parent = cfg_mgr.get_folder(self.config, parent_path)
+        if parent is None:
+            return None
+        folder_id = self.folder_stack[-1]
+        for slot in parent["slots"]:
+            if slot.get("type") == "folder" and slot.get("value") == folder_id:
+                return slot
+        return {"label": "Folder", "show_label": True}
+
     def _refresh_wheel(self):
         folder = self._current_folder()
         if folder is None:
             folder = cfg_mgr.get_folder(self.config, [])
             self.folder_stack = []
         self.wheel.set_slots(folder["slots"])
+        self.wheel.set_centre_slot(self._current_folder_slot())
         self.wheel.update()
 
     # ── Slot selection (on Super+Alt release) ───────────────────
