@@ -4,32 +4,32 @@
       "super",
       "alt"
     ],
-    "folder_dwell_ms": 400,
+    "folder_dwell_ms": 300,
     "wheel_radius": 180,
     "inner_radius": 50,
-    "bg_opacity": 220,
+    "bg_opacity": 153,
     "segment_color": [
-      50,
-      50,
-      55,
+      93,
+      98,
+      113,
       200
     ],
     "hover_color": [
-      80,
-      120,
+      129,
+      145,
       200,
       200
     ],
     "text_color": [
-      220,
-      220,
-      220,
+      255,
+      255,
+      255,
       255
     ],
     "border_color": [
-      100,
-      100,
-      110,
+      0,
+      0,
+      0,
       180
     ],
     "font_size": 9
@@ -37,65 +37,65 @@
   "root": {
     "slots": [
       {
-        "label": "Select to add action",
-        "type": null,
-        "value": null,
-        "icon": null,
-        "icon_type": null,
-        "show_label": true
-      },
-      {
-        "label": "Select to add action",
-        "type": null,
-        "value": null,
-        "icon": null,
-        "icon_type": null,
-        "show_label": true
-      },
-      {
-        "label": "Select to add action",
-        "type": null,
-        "value": null,
-        "icon": null,
-        "icon_type": null,
-        "show_label": true
-      },
-      {
-        "label": "F2",
-        "type": "folder",
-        "value": "folder_91656c23",
-        "icon": null,
-        "icon_type": null,
-        "show_label": true
-      },
-      {
-        "label": "Todoist",
-        "type": "launch",
-        "value": "C:/Users/Noah Cassidy/AppData/Local/Programs/todoist/Todoist.exe",
-        "icon": "C:\\Users\\Noah Cassidy\\Documents\\Code\\OnTheGoUtilityDevelopment\\quick-access-wheel\\icons\\Clover.png",
-        "icon_type": "image",
-        "show_label": false
-      },
-      {
-        "label": "A",
+        "label": "Calculator",
         "type": "keystroke",
-        "value": "A",
-        "icon": null,
-        "icon_type": null,
-        "show_label": true
-      },
-      {
-        "label": "F1",
-        "type": "folder",
-        "value": "folder_5f44bc19",
-        "icon": "\ud83e\udd37",
+        "value": "Alt+space",
+        "icon": "\ud83e\uddee",
         "icon_type": "emoji",
         "show_label": false
       },
       {
-        "label": "CMD Pal",
+        "label": "Always on Top",
         "type": "keystroke",
-        "value": "Alt+space",
+        "value": "Ctrl+Meta+T",
+        "icon": null,
+        "icon_type": null,
+        "show_label": true
+      },
+      {
+        "label": "Select to add action",
+        "type": null,
+        "value": null,
+        "icon": null,
+        "icon_type": null,
+        "show_label": true
+      },
+      {
+        "label": "Select to add action",
+        "type": null,
+        "value": null,
+        "icon": null,
+        "icon_type": null,
+        "show_label": true
+      },
+      {
+        "label": "Select to add action",
+        "type": null,
+        "value": null,
+        "icon": null,
+        "icon_type": null,
+        "show_label": true
+      },
+      {
+        "label": "Select to add action",
+        "type": null,
+        "value": null,
+        "icon": null,
+        "icon_type": null,
+        "show_label": true
+      },
+      {
+        "label": "Projects",
+        "type": "folder",
+        "value": "folder_347b10a1",
+        "icon": null,
+        "icon_type": null,
+        "show_label": true
+      },
+      {
+        "label": "Overhead",
+        "type": "folder",
+        "value": "folder_e79082a8",
         "icon": null,
         "icon_type": null,
         "show_label": true
@@ -221,6 +221,201 @@
         "label": "Select to add action",
         "type": null,
         "value": null,
+        "icon": null,
+        "icon_type": null,
+        "show_label": true
+      },
+      {
+        "label": "Back",
+        "type": "back",
+        "value": null
+      }
+    ]
+  },
+  "folder_347b10a1": {
+    "slots": [
+      {
+        "label": "Select to add action",
+        "type": null,
+        "value": null,
+        "icon": null,
+        "icon_type": null,
+        "show_label": true
+      },
+      {
+        "label": "Select to add action",
+        "type": null,
+        "value": null,
+        "icon": null,
+        "icon_type": null,
+        "show_label": true
+      },
+      {
+        "label": "Select to add action",
+        "type": null,
+        "value": null,
+        "icon": null,
+        "icon_type": null,
+        "show_label": true
+      },
+      {
+        "label": "Select to add action",
+        "type": null,
+        "value": null,
+        "icon": null,
+        "icon_type": null,
+        "show_label": true
+      },
+      {
+        "label": "Select to add action",
+        "type": null,
+        "value": null,
+        "icon": null,
+        "icon_type": null,
+        "show_label": true
+      },
+      {
+        "label": "Select to add action",
+        "type": null,
+        "value": null,
+        "icon": null,
+        "icon_type": null,
+        "show_label": true
+      },
+      {
+        "label": "Chartwell-Seasons",
+        "type": "folder",
+        "value": "folder_afe4b6a9",
+        "icon": null,
+        "icon_type": null,
+        "show_label": true
+      },
+      {
+        "label": "Back",
+        "type": "back",
+        "value": null
+      }
+    ]
+  },
+  "folder_e79082a8": {
+    "slots": [
+      {
+        "label": "Select to add action",
+        "type": null,
+        "value": null,
+        "icon": null,
+        "icon_type": null,
+        "show_label": true
+      },
+      {
+        "label": "Select to add action",
+        "type": null,
+        "value": null,
+        "icon": null,
+        "icon_type": null,
+        "show_label": true
+      },
+      {
+        "label": "Select to add action",
+        "type": null,
+        "value": null,
+        "icon": null,
+        "icon_type": null,
+        "show_label": true
+      },
+      {
+        "label": "Select to add action",
+        "type": null,
+        "value": null,
+        "icon": null,
+        "icon_type": null,
+        "show_label": true
+      },
+      {
+        "label": "Select to add action",
+        "type": null,
+        "value": null,
+        "icon": null,
+        "icon_type": null,
+        "show_label": true
+      },
+      {
+        "label": "Select to add action",
+        "type": null,
+        "value": null,
+        "icon": null,
+        "icon_type": null,
+        "show_label": true
+      },
+      {
+        "label": "Code",
+        "type": "command",
+        "value": "explorer.exe \"C:\\Users\\ncassidy\\OneDrive - SP\\00 Admin\\Code\"",
+        "icon": "\ud83d\udcc1",
+        "icon_type": "emoji",
+        "show_label": true
+      },
+      {
+        "label": "Back",
+        "type": "back",
+        "value": null
+      }
+    ]
+  },
+  "folder_afe4b6a9": {
+    "slots": [
+      {
+        "label": "Select to add action",
+        "type": null,
+        "value": null,
+        "icon": null,
+        "icon_type": null,
+        "show_label": true
+      },
+      {
+        "label": "Select to add action",
+        "type": null,
+        "value": null,
+        "icon": null,
+        "icon_type": null,
+        "show_label": true
+      },
+      {
+        "label": "Select to add action",
+        "type": null,
+        "value": null,
+        "icon": null,
+        "icon_type": null,
+        "show_label": true
+      },
+      {
+        "label": "P - Royal Oak Village",
+        "type": "command",
+        "value": "explorer.exe \"C:\\Users\\ncassidy\\OneDrive - SP\\02 Projects\\26TA024 - Chartwell Seasons\\P - Royal Oak Village\"",
+        "icon": null,
+        "icon_type": null,
+        "show_label": true
+      },
+      {
+        "label": "O - Belle River",
+        "type": "command",
+        "value": "explorer.exe \"C:\\Users\\ncassidy\\OneDrive - SP\\02 Projects\\26TA024 - Chartwell Seasons\\O - Belle River\"",
+        "icon": null,
+        "icon_type": null,
+        "show_label": true
+      },
+      {
+        "label": "N - Amherstburg",
+        "type": "command",
+        "value": "explorer.exe \"C:\\Users\\ncassidy\\OneDrive - SP\\02 Projects\\26TA024 - Chartwell Seasons\\N - Amherstburg\"",
+        "icon": null,
+        "icon_type": null,
+        "show_label": true
+      },
+      {
+        "label": "Chartwell Seasons",
+        "type": "command",
+        "value": "explorer.exe \"C:\\Users\\ncassidy\\OneDrive - SP\\02 Projects\\26TA024 - Chartwell Seasons\\\"",
         "icon": null,
         "icon_type": null,
         "show_label": true

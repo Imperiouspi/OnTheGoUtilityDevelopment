@@ -7,3 +7,8 @@
 - Switch keystroke action from "press keys" to "select modifiers + type key into box". Have a "?" button so it's clear what to call special keys e.g. space.
 - Add a "reload manual config changes" button to settings, just in case the user changed the config in a text editor
 - Create an exe that can run in the background so I don't have to launch the python file every time.
+- If a folder is removed, ask if remove from config. If create a new folder, optionally restore from saved.
+- Create templates for programs: microsoft office (onenote, excel, word, ppt), explorer, sublime text to open with file (or path, in the case of explorer).
+- If a folder opens up to another folder, automatically continue to that folder without having to return to the centre.
+- Open new branch - test opening folder around mouse instead of around original location.
+- Left click to execute faster, right clickt to edit config
