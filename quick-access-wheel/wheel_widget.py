@@ -65,7 +65,12 @@ class WheelWidget(QWidget):
         self._folder_dwell_timer.setSingleShot(True)
         self._folder_dwell_timer.setInterval(400)
         self._folder_dwell_timer.timeout.connect(self._on_folder_dwell)
-        self._suppress_back_dwell = False
+        self._dwell_ms = 400
+        self._auto_continue_extra_ms = 200
+        # After folder navigation, suppress dwell for the slot type
+        # that would cause an unwanted immediate reversal.
+        self._suppress_back_dwell = False   # set after entering a folder
+        self._suppress_folder_dwell = False  # set after going back
 
     def _recalc_geometry(self):
         """Recalculate widget size and key positions based on current settings."""
@@ -96,8 +101,9 @@ class WheelWidget(QWidget):
         bc = settings.get("border_color", [100, 100, 110, 180])
         self._border_color = QColor(*bc)
 
-        dwell = settings.get("folder_dwell_ms", 400)
-        self._folder_dwell_timer.setInterval(dwell)
+        self._dwell_ms = settings.get("folder_dwell_ms", 400)
+        self._auto_continue_extra_ms = settings.get("auto_continue_extra_ms", 200)
+        self._folder_dwell_timer.setInterval(self._dwell_ms)
 
         self._recalc_geometry()
         self.update()
@@ -144,18 +150,29 @@ class WheelWidget(QWidget):
                 # Activate the hovered action and close the wheel
                 self.hide()
 
-    def reset_hover(self):
+    def reset_hover(self, direction="enter"):
         """Reset hover state so the next mouse-track tick re-evaluates the current position.
 
         Call this after changing folder contents so that if the mouse is already
         over a folder slot in the new view, the dwell timer starts immediately
         without requiring the user to move the mouse away and back.
-        The back button is excluded from auto-continuation to prevent
-        an immediate bounce-back when the mouse happens to land on it.
+
+        direction:
+            "enter" — just entered a folder; suppress back-dwell so we don't
+                      immediately bounce back, and use extended dwell for
+                      auto-continuing into nested folders.
+            "back"  — just went back; suppress folder-dwell so a folder
+                      that happens to be under the back-button position
+                      doesn't auto-activate.
         """
         self._hovered_slot = -1
         self._folder_dwell_timer.stop()
-        self._suppress_back_dwell = True
+        if direction == "enter":
+            self._suppress_back_dwell = True
+            self._suppress_folder_dwell = False
+        else:  # "back"
+            self._suppress_back_dwell = False
+            self._suppress_folder_dwell = True
 
     def set_slots(self, slots):
         self._slots = slots
@@ -205,17 +222,28 @@ class WheelWidget(QWidget):
             prev = self._hovered_slot
             self._hovered_slot = slot
             self._folder_dwell_timer.stop()
-            # Clear the back-dwell suppression once the user moves to a new slot
-            # (but not on the first re-evaluation after reset_hover where prev == -1)
+            # Clear suppression flags once the user moves to a genuinely
+            # different slot (not the first re-evaluation after reset_hover
+            # where prev == -1).
             if prev != -1:
                 self._suppress_back_dwell = False
+                self._suppress_folder_dwell = False
             # Start dwell timer if hovering a folder or back slot
             if slot < len(self._slots):
                 slot_data = self._slots[slot]
                 slot_type = slot_data.get("type")
-                if slot_type == "folder":
+                if slot_type == "folder" and not self._suppress_folder_dwell:
+                    # Use extended dwell for auto-continuation (prev == -1
+                    # means this is the first evaluation after a folder
+                    # transition via reset_hover).
+                    if prev == -1 and self._auto_continue_extra_ms > 0:
+                        self._folder_dwell_timer.setInterval(
+                            self._dwell_ms + self._auto_continue_extra_ms)
+                    else:
+                        self._folder_dwell_timer.setInterval(self._dwell_ms)
                     self._folder_dwell_timer.start()
                 elif slot_type == "back" and not self._suppress_back_dwell:
+                    self._folder_dwell_timer.setInterval(self._dwell_ms)
                     self._folder_dwell_timer.start()
             self.update()
 

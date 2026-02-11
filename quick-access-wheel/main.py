@@ -167,12 +167,16 @@ class QuickAccessWheel:
                 # Reset hover so the wheel re-evaluates the mouse position
                 # in the new folder — enables auto-continuation without
                 # requiring the user to move the mouse back to the centre.
-                self.wheel.reset_hover()
+                # "enter" suppresses back-dwell and uses extended dwell for
+                # any folder under the cursor.
+                self.wheel.reset_hover(direction="enter")
         elif slot.get("type") == "back":
             if self.folder_stack:
                 self.folder_stack.pop()
                 self._refresh_wheel()
-                self.wheel.reset_hover()
+                # "back" suppresses folder-dwell so a folder that happens
+                # to sit under the back-button position doesn't auto-fire.
+                self.wheel.reset_hover(direction="back")
 
     # ── Folder management helpers ─────────────────────────────
     def _collect_referenced_folders(self):

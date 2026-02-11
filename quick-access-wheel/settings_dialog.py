@@ -94,6 +94,17 @@ class SettingsDialog(QDialog):
         self._dwell_spin.setValue(self._settings.get("folder_dwell_ms", 400))
         timing_layout.addRow("Folder/Back hover delay:", self._dwell_spin)
 
+        self._extra_dwell_spin = QSpinBox()
+        self._extra_dwell_spin.setRange(0, 2000)
+        self._extra_dwell_spin.setSuffix(" ms")
+        self._extra_dwell_spin.setSingleStep(50)
+        self._extra_dwell_spin.setValue(self._settings.get("auto_continue_extra_ms", 200))
+        self._extra_dwell_spin.setToolTip(
+            "Extra delay added when auto-continuing into nested folders,\n"
+            "giving you time to read the new folder before going deeper."
+        )
+        timing_layout.addRow("Auto-continue extra delay:", self._extra_dwell_spin)
+
         layout.addWidget(timing_group)
 
         # ── Styling ──────────────────────────────────────────────
@@ -177,6 +188,7 @@ class SettingsDialog(QDialog):
         self._key1_combo.setCurrentIndex(KEY_OPTIONS.index(defaults["activation_keys"][0]))
         self._key2_combo.setCurrentIndex(KEY_OPTIONS.index(defaults["activation_keys"][1]))
         self._dwell_spin.setValue(defaults["folder_dwell_ms"])
+        self._extra_dwell_spin.setValue(defaults["auto_continue_extra_ms"])
         self._radius_spin.setValue(defaults["wheel_radius"])
         self._inner_spin.setValue(defaults["inner_radius"])
         self._opacity_slider.setValue(defaults["bg_opacity"])
@@ -196,6 +208,7 @@ class SettingsDialog(QDialog):
             KEY_OPTIONS[self._key2_combo.currentIndex()],
         ]
         self._settings["folder_dwell_ms"] = self._dwell_spin.value()
+        self._settings["auto_continue_extra_ms"] = self._extra_dwell_spin.value()
         self._settings["wheel_radius"] = self._radius_spin.value()
         self._settings["inner_radius"] = self._inner_spin.value()
         self._settings["bg_opacity"] = self._opacity_slider.value()

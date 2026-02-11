@@ -27,6 +27,7 @@ def default_settings():
     return {
         "activation_keys": ["super", "alt"],
         "folder_dwell_ms": 400,
+        "auto_continue_extra_ms": 200,
         "wheel_radius": 180,
         "inner_radius": 50,
         "bg_opacity": 220,
