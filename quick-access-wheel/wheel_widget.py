@@ -210,6 +210,11 @@ class WheelWidget(QWidget):
             if self._hovered_slot != -1:
                 self._hovered_slot = -1
                 self._folder_dwell_timer.stop()
+                # Returning to the centre (or leaving the wheel) counts as
+                # moving away — clear navigation suppression flags so the
+                # next slot hover behaves normally.
+                self._suppress_back_dwell = False
+                self._suppress_folder_dwell = False
                 self.update()
             return
 
