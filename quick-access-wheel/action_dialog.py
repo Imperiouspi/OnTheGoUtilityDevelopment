@@ -8,6 +8,8 @@ from PyQt5.QtCore import Qt, QSize
 from PyQt5.QtGui import QKeySequence, QPixmap, QFont, QIcon
 
 import os
+import glob
+import subprocess
 
 # Curated emoji database grouped by category
 EMOJI_DATABASE = {
@@ -45,28 +47,110 @@ EMOJI_DATABASE = {
     ],
 }
 
+# Special key names recognized by the executor
+SPECIAL_KEYS_HELP = (
+    "Special key names you can type:\n\n"
+    "  space        - Spacebar\n"
+    "  enter        - Enter / Return\n"
+    "  tab          - Tab\n"
+    "  escape       - Escape\n"
+    "  backspace    - Backspace\n"
+    "  delete       - Delete\n"
+    "  home         - Home\n"
+    "  end          - End\n"
+    "  pageup       - Page Up\n"
+    "  pagedown     - Page Down\n"
+    "  up           - Arrow Up\n"
+    "  down         - Arrow Down\n"
+    "  left         - Arrow Left\n"
+    "  right        - Arrow Right\n"
+    "  f1 .. f12    - Function keys\n\n"
+    "For normal keys, just type the character (a, b, 1, 2, etc.)."
+)
 
-class KeySequenceEdit(QLineEdit):
-    """A line edit that captures a key combination when focused."""
 
-    def __init__(self, parent=None):
-        super().__init__(parent)
-        self.setReadOnly(True)
-        self.setPlaceholderText("Click here, then press a key combo...")
-        self._keys = []
+def _find_program_icon(program_path):
+    """Try to find a .desktop file icon for the given program path.
 
-    def keyPressEvent(self, event):
-        modifiers = event.modifiers()
-        key = event.key()
+    Searches standard XDG application directories for .desktop files
+    that reference this program, then resolves the icon via the theme.
+    Returns an absolute path to a PNG file, or None.
+    """
+    basename = os.path.basename(program_path)
+    search_dirs = [
+        os.path.expanduser("~/.local/share/applications"),
+        "/usr/share/applications",
+        "/usr/local/share/applications",
+    ]
 
-        if key in (Qt.Key_Control, Qt.Key_Shift, Qt.Key_Alt, Qt.Key_Meta):
-            return
+    icon_name = None
+    for d in search_dirs:
+        if not os.path.isdir(d):
+            continue
+        for desktop_file in glob.glob(os.path.join(d, "*.desktop")):
+            try:
+                with open(desktop_file, "r", errors="replace") as f:
+                    content = f.read()
+            except OSError:
+                continue
+            # Check if the Exec line references our program
+            for line in content.splitlines():
+                stripped = line.strip()
+                if stripped.startswith("Exec="):
+                    exec_val = stripped[5:].strip()
+                    # The Exec value may have %u, %f etc. and arguments
+                    exec_cmd = exec_val.split()[0] if exec_val else ""
+                    if exec_cmd == program_path or os.path.basename(exec_cmd) == basename:
+                        # Found matching .desktop file, now get Icon
+                        for iline in content.splitlines():
+                            istripped = iline.strip()
+                            if istripped.startswith("Icon="):
+                                icon_name = istripped[5:].strip()
+                                break
+                        break
+            if icon_name:
+                break
+        if icon_name:
+            break
 
-        seq = QKeySequence(int(modifiers) | key)
-        self.setText(seq.toString())
+    if not icon_name:
+        return None
 
-    def get_value(self):
-        return self.text()
+    # If icon_name is an absolute path, use it directly
+    if os.path.isabs(icon_name) and os.path.exists(icon_name):
+        return icon_name
+
+    # Try QIcon.fromTheme
+    theme_icon = QIcon.fromTheme(icon_name)
+    if not theme_icon.isNull():
+        # Save the icon as a PNG in the icons directory
+        icons_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "icons")
+        os.makedirs(icons_dir, exist_ok=True)
+        dest = os.path.join(icons_dir, f"{icon_name}.png")
+        pixmap = theme_icon.pixmap(64, 64)
+        if not pixmap.isNull():
+            pixmap.save(dest, "PNG")
+            return dest
+
+    # Try common icon paths
+    for size in ("64x64", "48x48", "scalable", "256x256", "128x128"):
+        for ext in (".png", ".svg"):
+            for theme_dir in ("/usr/share/icons/hicolor",
+                              "/usr/share/pixmaps"):
+                if size == "scalable" and ext == ".png":
+                    continue
+                real_ext = ".svg" if size == "scalable" else ext
+                candidate = os.path.join(theme_dir, size, "apps", icon_name + real_ext)
+                if os.path.exists(candidate):
+                    return candidate
+
+    # Check /usr/share/pixmaps directly
+    for ext in (".png", ".svg", ".xpm"):
+        candidate = os.path.join("/usr/share/pixmaps", icon_name + ext)
+        if os.path.exists(candidate):
+            return candidate
+
+    return None
 
 
 class EmojiPickerDialog(QDialog):
@@ -136,6 +220,7 @@ class ActionDialog(QDialog):
         self.result_data = None
         self._icon_value = None
         self._icon_type = None  # "emoji" or "image"
+        self._auto_icon_applied = False  # track if icon came from auto-detect
         self._build_ui(slot_data)
 
     def _build_ui(self, slot_data):
@@ -159,13 +244,36 @@ class ActionDialog(QDialog):
         # Stacked widget for type-specific inputs
         self._stack = QStackedWidget()
 
-        # Page 0: Keystroke
+        # Page 0: Keystroke — modifier checkboxes + key input
         keystroke_page = QWidget()
         ks_layout = QVBoxLayout(keystroke_page)
         ks_layout.setContentsMargins(0, 0, 0, 0)
-        self._key_edit = KeySequenceEdit()
-        ks_layout.addWidget(QLabel("Press the key combination:"))
-        ks_layout.addWidget(self._key_edit)
+
+        mod_row = QHBoxLayout()
+        mod_row.addWidget(QLabel("Modifiers:"))
+        self._mod_ctrl = QCheckBox("Ctrl")
+        self._mod_shift = QCheckBox("Shift")
+        self._mod_alt = QCheckBox("Alt")
+        self._mod_meta = QCheckBox("Meta")
+        mod_row.addWidget(self._mod_ctrl)
+        mod_row.addWidget(self._mod_shift)
+        mod_row.addWidget(self._mod_alt)
+        mod_row.addWidget(self._mod_meta)
+        mod_row.addStretch()
+        ks_layout.addLayout(mod_row)
+
+        key_row = QHBoxLayout()
+        key_row.addWidget(QLabel("Key:"))
+        self._key_input = QLineEdit()
+        self._key_input.setPlaceholderText("e.g. A, space, F1, enter")
+        key_row.addWidget(self._key_input)
+        help_btn = QPushButton("?")
+        help_btn.setFixedWidth(30)
+        help_btn.setToolTip("Show special key names")
+        help_btn.clicked.connect(self._show_key_help)
+        key_row.addWidget(help_btn)
+        ks_layout.addLayout(key_row)
+
         self._stack.addWidget(keystroke_page)
 
         # Page 1: Shell Command
@@ -276,7 +384,7 @@ class ActionDialog(QDialog):
 
         value = data.get("value", "")
         if idx == 0:
-            self._key_edit.setText(value or "")
+            self._prefill_keystroke(value or "")
         elif idx == 1:
             self._cmd_edit.setText(value or "")
         elif idx == 2:
@@ -293,6 +401,48 @@ class ActionDialog(QDialog):
         show_label = data.get("show_label", True)
         self._show_label_cb.setChecked(show_label)
 
+    def _prefill_keystroke(self, value):
+        """Parse a keystroke string like 'Ctrl+Shift+A' into modifier checkboxes + key."""
+        if not value:
+            return
+        parts = value.split("+")
+        key_part = ""
+        for part in parts:
+            p = part.strip()
+            if p == "Ctrl":
+                self._mod_ctrl.setChecked(True)
+            elif p == "Shift":
+                self._mod_shift.setChecked(True)
+            elif p == "Alt":
+                self._mod_alt.setChecked(True)
+            elif p == "Meta":
+                self._mod_meta.setChecked(True)
+            else:
+                key_part = p
+        self._key_input.setText(key_part)
+
+    def _build_keystroke_value(self):
+        """Build a keystroke string from modifier checkboxes and key input."""
+        parts = []
+        if self._mod_ctrl.isChecked():
+            parts.append("Ctrl")
+        if self._mod_shift.isChecked():
+            parts.append("Shift")
+        if self._mod_alt.isChecked():
+            parts.append("Alt")
+        if self._mod_meta.isChecked():
+            parts.append("Meta")
+        key = self._key_input.text().strip()
+        if key:
+            # Capitalize single letters for display consistency
+            if len(key) == 1 and key.isalpha():
+                key = key.upper()
+            parts.append(key)
+        return "+".join(parts)
+
+    def _show_key_help(self):
+        QMessageBox.information(self, "Special Key Names", SPECIAL_KEYS_HELP)
+
     def _on_type_changed(self, index):
         self._stack.setCurrentIndex(index)
 
@@ -302,6 +452,30 @@ class ActionDialog(QDialog):
         )
         if path:
             self._program_edit.setText(path)
+            self._try_auto_icon(path)
+
+    def _try_auto_icon(self, program_path):
+        """Attempt to automatically find and set the program's icon."""
+        # Don't override a manually-set icon
+        if self._icon_value and not self._auto_icon_applied:
+            return
+        icon_path = _find_program_icon(program_path)
+        if icon_path:
+            # Copy to icons dir if not already there
+            icons_dir = os.path.join(
+                os.path.dirname(os.path.abspath(__file__)), "icons"
+            )
+            os.makedirs(icons_dir, exist_ok=True)
+            dest = os.path.join(icons_dir, os.path.basename(icon_path))
+            if os.path.abspath(icon_path) != os.path.abspath(dest):
+                import shutil
+                shutil.copy2(icon_path, dest)
+            else:
+                dest = icon_path
+            self._icon_value = dest
+            self._icon_type = "image"
+            self._auto_icon_applied = True
+            self._update_icon_preview()
 
     # ── Icon methods ──────────────────────────────────────────────
 
@@ -310,6 +484,7 @@ class ActionDialog(QDialog):
         if dlg.exec_() and dlg.selected_emoji:
             self._icon_value = dlg.selected_emoji
             self._icon_type = "emoji"
+            self._auto_icon_applied = False
             self._update_icon_preview()
 
     def _pick_image(self):
@@ -329,11 +504,13 @@ class ActionDialog(QDialog):
                 shutil.copy2(path, dest)
             self._icon_value = dest
             self._icon_type = "image"
+            self._auto_icon_applied = False
             self._update_icon_preview()
 
     def _clear_icon(self):
         self._icon_value = None
         self._icon_type = None
+        self._auto_icon_applied = False
         self._icon_preview.clear()
 
     def _update_icon_preview(self):
@@ -362,9 +539,10 @@ class ActionDialog(QDialog):
         action_type = type_names[idx]
 
         if idx == 0:
-            value = self._key_edit.get_value()
-            if not value:
-                QMessageBox.warning(self, "Missing", "Please press a key combination.")
+            value = self._build_keystroke_value()
+            key_text = self._key_input.text().strip()
+            if not key_text:
+                QMessageBox.warning(self, "Missing", "Please enter a key.")
                 return
             if not label:
                 label = value
@@ -382,6 +560,9 @@ class ActionDialog(QDialog):
                 return
             if not label:
                 label = value.split("/")[-1]
+            # Auto-detect icon on save if not already set
+            if not self._icon_value:
+                self._try_auto_icon(value)
         elif idx == 3:
             value = None
             if not label:

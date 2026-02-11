@@ -4,7 +4,7 @@
 import sys
 import os
 
-from PyQt5.QtWidgets import QApplication, QSystemTrayIcon, QMenu, QAction
+from PyQt5.QtWidgets import QApplication, QSystemTrayIcon, QMenu, QAction, QMessageBox, QInputDialog
 from PyQt5.QtGui import QIcon, QPixmap, QPainter, QColor
 from PyQt5.QtCore import Qt, QTimer
 
@@ -164,10 +164,59 @@ class QuickAccessWheel:
                     cfg_mgr.create_subfolder(self.config, subfolder_id)
                 self.folder_stack.append(subfolder_id)
                 self._refresh_wheel()
+                # Reset hover so the wheel re-evaluates the mouse position
+                # in the new folder — enables auto-continuation without
+                # requiring the user to move the mouse back to the centre.
+                # "enter" suppresses back-dwell and uses extended dwell for
+                # any folder under the cursor.
+                self.wheel.reset_hover(direction="enter")
         elif slot.get("type") == "back":
             if self.folder_stack:
                 self.folder_stack.pop()
                 self._refresh_wheel()
+                # "back" suppresses folder-dwell so a folder that happens
+                # to sit under the back-button position doesn't auto-fire.
+                self.wheel.reset_hover(direction="back")
+
+    # ── Folder management helpers ─────────────────────────────
+    def _collect_referenced_folders(self):
+        """Return set of all folder IDs that are referenced by a slot somewhere."""
+        referenced = set()
+        for key, value in self.config.items():
+            if key in ("settings",):
+                continue
+            if isinstance(value, dict) and "slots" in value:
+                for slot in value["slots"]:
+                    if slot.get("type") == "folder" and slot.get("value"):
+                        referenced.add(slot["value"])
+        return referenced
+
+    def _collect_all_folder_keys(self):
+        """Return set of all folder_* keys in config."""
+        return {k for k in self.config if k.startswith("folder_")}
+
+    def _find_orphaned_folders(self):
+        """Return folder IDs that exist in config but aren't referenced by any slot."""
+        all_folders = self._collect_all_folder_keys()
+        referenced = self._collect_referenced_folders()
+        return all_folders - referenced
+
+    def _remove_folder_recursive(self, folder_id):
+        """Remove a folder and all its unreferenced sub-folders from config."""
+        folder_data = self.config.get(folder_id)
+        if folder_data is None:
+            return
+        # Collect sub-folder IDs before removing
+        sub_ids = []
+        for slot in folder_data.get("slots", []):
+            if slot.get("type") == "folder" and slot.get("value"):
+                sub_ids.append(slot["value"])
+        # Remove this folder
+        del self.config[folder_id]
+        # Recursively remove sub-folders
+        for sub_id in sub_ids:
+            if sub_id in self.config:
+                self._remove_folder_recursive(sub_id)
 
     def _configure_slot(self, index):
         folder = self._current_folder()
@@ -177,12 +226,56 @@ class QuickAccessWheel:
         if slot.get("type") == "back":
             return
 
+        old_type = slot.get("type")
+        old_folder_id = slot.get("value") if old_type == "folder" else None
+
         dialog = ActionDialog(slot)
         if dialog.exec_() and dialog.result_data is not None:
             data = dialog.result_data
 
+            # If removing a folder slot, ask whether to delete the subfolder data
+            if old_folder_id and (data["type"] != "folder" or data.get("value") != old_folder_id):
+                reply = QMessageBox.question(
+                    None, "Remove Folder Data",
+                    "The folder was removed from this slot.\n"
+                    "Do you also want to remove its saved contents from the config?\n\n"
+                    "Choose 'No' to keep the data (you can restore it later).",
+                    QMessageBox.Yes | QMessageBox.No,
+                    QMessageBox.No,
+                )
+                if reply == QMessageBox.Yes:
+                    self._remove_folder_recursive(old_folder_id)
+
             if data["type"] == "folder":
-                folder_id = f"folder_{os.urandom(4).hex()}"
+                # Check for orphaned folders that could be restored
+                orphaned = self._find_orphaned_folders()
+                folder_id = None
+                if orphaned:
+                    # Build a list of orphaned folder labels for the user to choose
+                    choices = []
+                    orphan_list = sorted(orphaned)
+                    for oid in orphan_list:
+                        fdata = self.config.get(oid, {})
+                        slot_labels = [s.get("label", "?") for s in fdata.get("slots", [])
+                                       if s.get("type") and s.get("type") != "back"]
+                        desc = ", ".join(slot_labels[:3]) if slot_labels else "(empty)"
+                        choices.append(f"{oid}  [{desc}]")
+                    choices.insert(0, "(Create new empty folder)")
+
+                    choice, ok = QInputDialog.getItem(
+                        None, "Restore Folder?",
+                        "There are saved folders not currently in use.\n"
+                        "Would you like to restore one, or create a new folder?",
+                        choices, 0, False,
+                    )
+                    if ok and choice != "(Create new empty folder)":
+                        # Extract folder ID from the choice string
+                        folder_id = choice.split()[0]
+
+                if not folder_id:
+                    folder_id = f"folder_{os.urandom(4).hex()}"
+                    cfg_mgr.create_subfolder(self.config, folder_id)
+
                 folder["slots"][index] = {
                     "label": data["label"],
                     "type": "folder",
@@ -191,7 +284,6 @@ class QuickAccessWheel:
                     "icon_type": data.get("icon_type"),
                     "show_label": data.get("show_label", True),
                 }
-                cfg_mgr.create_subfolder(self.config, folder_id)
             else:
                 folder["slots"][index] = data
 
