@@ -134,10 +134,20 @@ class WheelWidget(QWidget):
             self.slot_selected.emit(selected)
 
     def mousePressEvent(self, event):
-        """Click on a segment to edit it."""
-        if event.button() == Qt.LeftButton and 0 <= self._hovered_slot < NUM_SLOTS:
+        """Right-click (primary) or left-click on a segment to edit it."""
+        if event.button() in (Qt.RightButton, Qt.LeftButton) and 0 <= self._hovered_slot < NUM_SLOTS:
             self._suppress_selection = True
             self.slot_clicked.emit(self._hovered_slot)
+
+    def reset_hover(self):
+        """Reset hover state so the next mouse-track tick re-evaluates the current position.
+
+        Call this after changing folder contents so that if the mouse is already
+        over a folder/back slot in the new view, the dwell timer starts immediately
+        without requiring the user to move the mouse away and back.
+        """
+        self._hovered_slot = -1
+        self._folder_dwell_timer.stop()
 
     def set_slots(self, slots):
         self._slots = slots

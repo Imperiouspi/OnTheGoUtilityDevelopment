@@ -140,6 +140,12 @@ class SettingsDialog(QDialog):
 
         # ── Buttons ──────────────────────────────────────────────
         btn_layout = QHBoxLayout()
+
+        reload_btn = QPushButton("Reload Config from Disk")
+        reload_btn.setToolTip("Re-read config.json if you edited it in a text editor")
+        reload_btn.clicked.connect(self._reload_config)
+        btn_layout.addWidget(reload_btn)
+
         btn_layout.addStretch()
 
         defaults_btn = QPushButton("Reset to Defaults")
@@ -156,6 +162,15 @@ class SettingsDialog(QDialog):
         btn_layout.addWidget(save_btn)
 
         layout.addLayout(btn_layout)
+
+    def _reload_config(self):
+        """Reload config.json from disk and close dialog so the app picks up changes."""
+        fresh = cfg_mgr.load_config()
+        # Replace the contents of the shared config dict in-place
+        self._config.clear()
+        self._config.update(fresh)
+        self._reloaded = True
+        self.accept()
 
     def _reset_defaults(self):
         defaults = cfg_mgr.default_settings()
