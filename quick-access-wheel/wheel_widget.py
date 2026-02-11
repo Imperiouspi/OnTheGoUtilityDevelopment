@@ -65,6 +65,7 @@ class WheelWidget(QWidget):
         self._folder_dwell_timer.setSingleShot(True)
         self._folder_dwell_timer.setInterval(400)
         self._folder_dwell_timer.timeout.connect(self._on_folder_dwell)
+        self._suppress_back_dwell = False
 
     def _recalc_geometry(self):
         """Recalculate widget size and key positions based on current settings."""
@@ -134,20 +135,27 @@ class WheelWidget(QWidget):
             self.slot_selected.emit(selected)
 
     def mousePressEvent(self, event):
-        """Right-click (primary) or left-click on a segment to edit it."""
-        if event.button() in (Qt.RightButton, Qt.LeftButton) and 0 <= self._hovered_slot < NUM_SLOTS:
-            self._suppress_selection = True
-            self.slot_clicked.emit(self._hovered_slot)
+        """Right-click to edit a slot; left-click to activate the action and close."""
+        if 0 <= self._hovered_slot < NUM_SLOTS:
+            if event.button() == Qt.RightButton:
+                self._suppress_selection = True
+                self.slot_clicked.emit(self._hovered_slot)
+            elif event.button() == Qt.LeftButton:
+                # Activate the hovered action and close the wheel
+                self.hide()
 
     def reset_hover(self):
         """Reset hover state so the next mouse-track tick re-evaluates the current position.
 
         Call this after changing folder contents so that if the mouse is already
-        over a folder/back slot in the new view, the dwell timer starts immediately
+        over a folder slot in the new view, the dwell timer starts immediately
         without requiring the user to move the mouse away and back.
+        The back button is excluded from auto-continuation to prevent
+        an immediate bounce-back when the mouse happens to land on it.
         """
         self._hovered_slot = -1
         self._folder_dwell_timer.stop()
+        self._suppress_back_dwell = True
 
     def set_slots(self, slots):
         self._slots = slots
@@ -194,12 +202,20 @@ class WheelWidget(QWidget):
 
         slot = int(angle / SEGMENT_ANGLE) % NUM_SLOTS
         if slot != self._hovered_slot:
+            prev = self._hovered_slot
             self._hovered_slot = slot
             self._folder_dwell_timer.stop()
+            # Clear the back-dwell suppression once the user moves to a new slot
+            # (but not on the first re-evaluation after reset_hover where prev == -1)
+            if prev != -1:
+                self._suppress_back_dwell = False
             # Start dwell timer if hovering a folder or back slot
             if slot < len(self._slots):
                 slot_data = self._slots[slot]
-                if slot_data.get("type") in ("folder", "back"):
+                slot_type = slot_data.get("type")
+                if slot_type == "folder":
+                    self._folder_dwell_timer.start()
+                elif slot_type == "back" and not self._suppress_back_dwell:
                     self._folder_dwell_timer.start()
             self.update()
 
