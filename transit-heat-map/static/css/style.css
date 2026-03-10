@@ -1,0 +1,150 @@
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  display: flex;
+  height: 100vh;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  color: #333;
+}
+
+#sidebar {
+  width: 320px;
+  min-width: 320px;
+  padding: 24px;
+  background: #f8f9fa;
+  border-right: 1px solid #dee2e6;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+#sidebar h1 {
+  font-size: 1.4rem;
+  color: #c41e3a;
+}
+
+#sidebar p {
+  font-size: 0.9rem;
+  color: #555;
+  line-height: 1.5;
+}
+
+.control-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.control-group label {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #444;
+}
+
+.control-group select,
+.control-group input {
+  padding: 8px 10px;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  font-size: 0.9rem;
+  background: #fff;
+}
+
+#generate-btn {
+  padding: 12px;
+  background: #c41e3a;
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+#generate-btn:hover:not(:disabled) {
+  background: #a01830;
+}
+
+#generate-btn:disabled {
+  background: #999;
+  cursor: not-allowed;
+}
+
+#status {
+  padding: 10px;
+  border-radius: 6px;
+  font-size: 0.85rem;
+  text-align: center;
+}
+
+#status.loading {
+  background: #fff3cd;
+  color: #856404;
+}
+
+#status.error {
+  background: #f8d7da;
+  color: #721c24;
+}
+
+#status.success {
+  background: #d4edda;
+  color: #155724;
+}
+
+.hidden {
+  display: none !important;
+}
+
+#legend {
+  padding: 12px;
+  background: #fff;
+  border: 1px solid #dee2e6;
+  border-radius: 8px;
+}
+
+#legend h3 {
+  font-size: 0.85rem;
+  margin-bottom: 8px;
+}
+
+.legend-bar {
+  height: 16px;
+  border-radius: 4px;
+  background: linear-gradient(to right, #00ff00, #aaff00, #ffff00, #ffaa00, #ff5500, #ff0000, #880000);
+}
+
+.legend-labels {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.75rem;
+  margin-top: 4px;
+  color: #666;
+}
+
+#pin-info {
+  padding: 12px;
+  background: #fff;
+  border: 1px solid #dee2e6;
+  border-radius: 8px;
+}
+
+#pin-info h3 {
+  font-size: 0.85rem;
+  margin-bottom: 4px;
+}
+
+#pin-info p {
+  font-size: 0.8rem;
+}
+
+#map {
+  flex: 1;
+  min-height: 100vh;
+}

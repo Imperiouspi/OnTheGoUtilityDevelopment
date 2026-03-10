@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TTC Transit Heat Map</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <link rel="stylesheet" href="/static/css/style.css" />
+</head>
+<body>
+  <div id="sidebar">
+    <h1>TTC Transit Heat Map</h1>
+    <p>Click anywhere on the map to place a pin, then generate a heat map showing travel times from across Toronto to that location via TTC.</p>
+
+    <div class="control-group">
+      <label for="grid-size">Grid Resolution</label>
+      <select id="grid-size">
+        <option value="15">Low (15x15) — Fast</option>
+        <option value="25" selected>Medium (25x25)</option>
+        <option value="35">High (35x35) — Slow</option>
+        <option value="50">Very High (50x50) — Very Slow</option>
+      </select>
+    </div>
+
+    <div class="control-group">
+      <label for="depart-time">Departure Time</label>
+      <input type="datetime-local" id="depart-time" />
+    </div>
+
+    <button id="generate-btn" disabled>Generate Heat Map</button>
+
+    <div id="status" class="hidden"></div>
+
+    <div id="legend" class="hidden">
+      <h3>Travel Time (minutes)</h3>
+      <div class="legend-bar"></div>
+      <div class="legend-labels">
+        <span>0</span>
+        <span>30</span>
+        <span>60</span>
+        <span>90+</span>
+      </div>
+    </div>
+
+    <div id="pin-info" class="hidden">
+      <h3>Destination</h3>
+      <p id="pin-coords"></p>
+    </div>
+  </div>
+
+  <div id="map"></div>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="/static/js/app.js"></script>
+</body>
+</html>

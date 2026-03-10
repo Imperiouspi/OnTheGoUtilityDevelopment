@@ -1,0 +1,11 @@
+services:
+  motis:
+    image: ghcr.io/motis-project/motis:latest
+    container_name: motis-ttc
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./data:/data
+      - ./motis-config.yml:/config.yml
+    command: ["server"]
+    restart: unless-stopped
