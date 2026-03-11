@@ -70,7 +70,7 @@ def debug():
         params = {
             "fromPlace": "43.6532,-79.3832",
             "toPlace": "43.7000,-79.4000",
-            "time": str(int(datetime.now(timezone.utc).timestamp())),
+            "time": _to_motis_time(),
             "arriveBy": "false",
         }
         try:
@@ -97,7 +97,7 @@ def _detect_api_prefix():
                 params={
                     "fromPlace": "43.6532,-79.3832",
                     "toPlace": "43.6600,-79.3900",
-                    "time": str(int(datetime.now(timezone.utc).timestamp())),
+                    "time": _to_motis_time(),
                 },
                 timeout=10,
             )
@@ -127,25 +127,27 @@ def _generate_grid(grid_size):
     return points
 
 
-def _parse_depart_time(depart_time):
-    """Convert a departure time string to a Unix timestamp for MOTIS."""
-    try:
-        dt = datetime.fromisoformat(depart_time.replace("Z", "+00:00"))
-    except (ValueError, AttributeError):
+def _to_motis_time(depart_time=None):
+    """Convert a departure time string to ISO 8601 with Z suffix for MOTIS."""
+    if depart_time:
+        try:
+            dt = datetime.fromisoformat(depart_time.replace("Z", "+00:00"))
+        except (ValueError, AttributeError):
+            dt = datetime.now(timezone.utc)
+    else:
         dt = datetime.now(timezone.utc)
-    return str(int(dt.timestamp()))
+    return dt.strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
 def _query_single_route(from_lat, from_lng, to_lat, to_lng, depart_time, api_prefix):
     """Query MOTIS for a single origin -> destination route."""
     try:
-        timestamp = _parse_depart_time(depart_time)
         resp = requests.get(
             f"{MOTIS_URL}{api_prefix}/plan",
             params={
                 "fromPlace": f"{from_lat},{from_lng}",
                 "toPlace": f"{to_lat},{to_lng}",
-                "time": timestamp,
+                "time": _to_motis_time(depart_time),
                 "arriveBy": "false",
             },
             timeout=15,
