@@ -1,4 +1,13 @@
 services:
+  motis-import:
+    image: ghcr.io/motis-project/motis:latest
+    container_name: motis-ttc-import
+    volumes:
+      - ./data:/data
+      - ./motis-config.yml:/config.yml
+    command: ["./motis", "import"]
+    profiles: ["import"]
+
   motis:
     image: ghcr.io/motis-project/motis:latest
     container_name: motis-ttc
@@ -7,5 +16,9 @@ services:
     volumes:
       - ./data:/data
       - ./motis-config.yml:/config.yml
-    command: ["server"]
+    command: ["./motis", "server"]
     restart: unless-stopped
+    depends_on:
+      motis-import:
+        condition: service_completed_successfully
+        required: false

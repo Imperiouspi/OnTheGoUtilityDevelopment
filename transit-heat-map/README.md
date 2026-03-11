@@ -40,7 +40,7 @@ This downloads:
 ### 2. Import data into MOTIS
 
 ```bash
-docker compose run --rm motis import
+docker compose --profile import run --rm motis-import
 ```
 
 This preprocesses the GTFS and OSM data. It may take several minutes.
@@ -48,7 +48,7 @@ This preprocesses the GTFS and OSM data. It may take several minutes.
 ### 3. Start MOTIS
 
 ```bash
-docker compose up -d
+docker compose up -d motis
 ```
 
 MOTIS will be available at `http://localhost:8080`.
