@@ -67,10 +67,12 @@ def debug():
     if api:
         # Try a single test query near downtown Toronto
         test_url = f"{MOTIS_URL}{api}/plan"
+        now = datetime.now(timezone.utc)
         params = {
             "fromPlace": "43.6532,-79.3832",
             "toPlace": "43.7000,-79.4000",
-            "time": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+            "date": now.strftime("%Y-%m-%d"),
+            "time": now.strftime("%H:%M"),
             "arriveBy": "false",
         }
         try:
@@ -92,11 +94,14 @@ def _detect_api_prefix():
     candidates = ["/api/v1", "/api/v2", "/api/v3", "/api/v4", "/api/v5", "/api"]
     for prefix in candidates:
         try:
+            now = datetime.now(timezone.utc)
             resp = requests.get(
                 f"{MOTIS_URL}{prefix}/plan",
                 params={
                     "fromPlace": "43.6532,-79.3832",
                     "toPlace": "43.6600,-79.3900",
+                    "date": now.strftime("%Y-%m-%d"),
+                    "time": now.strftime("%H:%M"),
                 },
                 timeout=10,
             )
@@ -126,15 +131,26 @@ def _generate_grid(grid_size):
     return points
 
 
+def _parse_depart_time(depart_time):
+    """Split a departure time string into separate date and time params for MOTIS."""
+    try:
+        dt = datetime.fromisoformat(depart_time.replace("Z", "+00:00"))
+    except (ValueError, AttributeError):
+        dt = datetime.now(timezone.utc)
+    return dt.strftime("%Y-%m-%d"), dt.strftime("%H:%M")
+
+
 def _query_single_route(from_lat, from_lng, to_lat, to_lng, depart_time, api_prefix):
     """Query MOTIS for a single origin -> destination route."""
     try:
+        date_str, time_str = _parse_depart_time(depart_time)
         resp = requests.get(
             f"{MOTIS_URL}{api_prefix}/plan",
             params={
                 "fromPlace": f"{from_lat},{from_lng}",
                 "toPlace": f"{to_lat},{to_lng}",
-                "time": depart_time,
+                "date": date_str,
+                "time": time_str,
                 "arriveBy": "false",
             },
             timeout=15,
