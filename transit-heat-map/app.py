@@ -1,6 +1,10 @@
 import concurrent.futures
+import csv
+import io
 import logging
 import math
+import os
+import zipfile
 from datetime import datetime, timedelta, timezone
 
 import requests
@@ -11,6 +15,7 @@ logging.basicConfig(level=logging.INFO)
 log = logging.getLogger(__name__)
 
 MOTIS_URL = "http://localhost:8080"
+GTFS_PATH = os.path.join(os.path.dirname(__file__), "data", "ttc-gtfs.zip")
 _api_prefix = None
 
 # Toronto bounding box
@@ -51,20 +56,113 @@ def heatmap():
     return jsonify(results)
 
 
+@app.route("/api/gtfs-info")
+def gtfs_info():
+    """Read the GTFS zip to report the service date range."""
+    if not os.path.exists(GTFS_PATH):
+        return jsonify({
+            "error": "GTFS file not found. Run setup.sh to download TTC data.",
+            "gtfs_path": GTFS_PATH,
+            "data_dir_exists": os.path.isdir(os.path.dirname(GTFS_PATH)),
+        }), 404
+
+    return jsonify(_read_gtfs_date_range())
+
+
+def _read_gtfs_date_range():
+    """Extract the service date range from calendar.txt and calendar_dates.txt."""
+    info = {"gtfs_path": GTFS_PATH, "file_size_mb": round(os.path.getsize(GTFS_PATH) / 1e6, 1)}
+    all_dates = set()
+
+    try:
+        with zipfile.ZipFile(GTFS_PATH) as zf:
+            info["files"] = zf.namelist()
+
+            # calendar.txt: start_date / end_date columns (YYYYMMDD)
+            if "calendar.txt" in zf.namelist():
+                with zf.open("calendar.txt") as f:
+                    reader = csv.DictReader(io.TextIOWrapper(f, encoding="utf-8-sig"))
+                    starts, ends = [], []
+                    for row in reader:
+                        starts.append(row["start_date"])
+                        ends.append(row["end_date"])
+                    if starts:
+                        info["calendar_start"] = min(starts)
+                        info["calendar_end"] = max(ends)
+                        info["calendar_services"] = len(starts)
+                        all_dates.add(min(starts))
+                        all_dates.add(max(ends))
+
+            # calendar_dates.txt: date column (YYYYMMDD)
+            if "calendar_dates.txt" in zf.namelist():
+                with zf.open("calendar_dates.txt") as f:
+                    reader = csv.DictReader(io.TextIOWrapper(f, encoding="utf-8-sig"))
+                    dates = [row["date"] for row in reader]
+                    if dates:
+                        info["calendar_dates_min"] = min(dates)
+                        info["calendar_dates_max"] = max(dates)
+                        info["calendar_dates_count"] = len(dates)
+                        all_dates.add(min(dates))
+                        all_dates.add(max(dates))
+
+    except (zipfile.BadZipFile, KeyError, Exception) as e:
+        info["error"] = f"Failed to read GTFS zip: {e}"
+        return info
+
+    if all_dates:
+        overall_start = min(all_dates)
+        overall_end = max(all_dates)
+        info["overall_start"] = overall_start
+        info["overall_end"] = overall_end
+        # Format nicely: YYYYMMDD -> YYYY-MM-DD
+        info["service_range"] = (
+            f"{overall_start[:4]}-{overall_start[4:6]}-{overall_start[6:8]} to "
+            f"{overall_end[:4]}-{overall_end[4:6]}-{overall_end[6:8]}"
+        )
+        info["today"] = datetime.now(timezone.utc).strftime("%Y%m%d")
+        today_str = info["today"]
+        info["today_in_range"] = overall_start <= today_str <= overall_end
+
+    return info
+
+
 @app.route("/api/timetable-dates")
 def timetable_dates():
     """Probe MOTIS to discover the valid timetable date range."""
+    # First check if GTFS data even exists
+    if not os.path.exists(GTFS_PATH):
+        return jsonify({
+            "error": "GTFS data not found. Run setup.sh first to download TTC data, "
+                     "then run: docker compose --profile import run --rm motis-import && "
+                     "docker compose up -d motis"
+        }), 404
+
+    # Check the GTFS date range before probing MOTIS
+    gtfs = _read_gtfs_date_range()
+    if not gtfs.get("today_in_range", True):
+        return jsonify({
+            "error": f"GTFS feed covers {gtfs.get('service_range', 'unknown')} "
+                     f"but today is {gtfs.get('today', 'unknown')}. "
+                     "Download a fresh GTFS feed by re-running setup.sh, then re-import MOTIS.",
+            "gtfs_info": gtfs,
+        }), 404
+
     api = _detect_api_prefix()
     if not api:
-        return jsonify({"error": "Cannot reach MOTIS server"}), 502
+        return jsonify({"error": "Cannot reach MOTIS server. Is Docker running?"}), 502
 
     valid_date = _find_valid_date(api)
     if valid_date:
         return jsonify({
             "valid_date": valid_date.strftime("%Y-%m-%d"),
             "suggested_time": valid_date.strftime("%Y-%m-%dT08:00"),
+            "gtfs_info": gtfs,
         })
-    return jsonify({"error": "No valid timetable dates found in MOTIS"}), 404
+    return jsonify({
+        "error": "MOTIS returned no itineraries for any probed date. "
+                 "The GTFS feed may be corrupt or MOTIS needs re-importing.",
+        "gtfs_info": gtfs,
+    }), 404
 
 
 def _find_valid_date(api_prefix):

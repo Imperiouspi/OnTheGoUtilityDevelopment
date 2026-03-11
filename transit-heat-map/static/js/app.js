@@ -29,20 +29,21 @@ const departTimeEl = document.getElementById("depart-time");
 
 // Auto-detect valid timetable date from MOTIS, fall back to next weekday 8 AM
 (async function setDefaultDepartTime() {
+  let errorDetail = "";
   try {
     const resp = await fetch("/api/timetable-dates");
-    if (resp.ok) {
-      const data = await resp.json();
-      if (data.suggested_time) {
-        departTimeEl.value = data.suggested_time;
-        statusEl.className = "success";
-        statusEl.textContent = `MOTIS timetable active for ${data.valid_date}. Click the map to set a destination.`;
-        statusEl.classList.remove("hidden");
-        return;
-      }
+    const data = await resp.json();
+    if (resp.ok && data.suggested_time) {
+      departTimeEl.value = data.suggested_time;
+      const range = data.gtfs_info?.service_range || data.valid_date;
+      statusEl.className = "success";
+      statusEl.textContent = `MOTIS timetable active for ${data.valid_date} (feed covers ${range}). Click the map to set a destination.`;
+      statusEl.classList.remove("hidden");
+      return;
     }
+    errorDetail = data.error || "Unknown error";
   } catch (e) {
-    // Fall through to default
+    errorDetail = `Could not reach Flask server: ${e.message}`;
   }
   // Fallback: next weekday 8:00 AM
   const now = new Date();
@@ -54,8 +55,7 @@ const departTimeEl = document.getElementById("depart-time");
   nextDay.setHours(8, 0, 0, 0);
   departTimeEl.value = nextDay.toISOString().slice(0, 16);
   statusEl.className = "error";
-  statusEl.textContent =
-    "Warning: Could not detect valid timetable dates. The GTFS feed may not cover the selected date. Try re-importing MOTIS with fresh TTC data.";
+  statusEl.textContent = errorDetail;
   statusEl.classList.remove("hidden");
 })();
 
