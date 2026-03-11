@@ -137,21 +137,14 @@ def timetable_dates():
                      "docker compose up -d motis"
         }), 404
 
-    # Check the GTFS date range before probing MOTIS
+    # Read GTFS date range for informational purposes
     gtfs = _read_gtfs_date_range()
-    if not gtfs.get("today_in_range", True):
-        return jsonify({
-            "error": f"GTFS feed covers {gtfs.get('service_range', 'unknown')} "
-                     f"but today is {gtfs.get('today', 'unknown')}. "
-                     "Download a fresh GTFS feed by re-running setup.sh, then re-import MOTIS.",
-            "gtfs_info": gtfs,
-        }), 404
 
     api = _detect_api_prefix()
     if not api:
         return jsonify({"error": "Cannot reach MOTIS server. Is Docker running?"}), 502
 
-    valid_date = _find_valid_date(api)
+    valid_date = _find_valid_date(api, gtfs)
     if valid_date:
         return jsonify({
             "valid_date": valid_date.strftime("%Y-%m-%d"),
@@ -159,14 +152,19 @@ def timetable_dates():
             "gtfs_info": gtfs,
         })
     return jsonify({
-        "error": "MOTIS returned no itineraries for any probed date. "
-                 "The GTFS feed may be corrupt or MOTIS needs re-importing.",
+        "error": f"No active transit service found. "
+                 f"GTFS feed covers {gtfs.get('service_range', 'unknown')}. "
+                 "Try re-running setup.sh to download fresh data, then re-import MOTIS.",
         "gtfs_info": gtfs,
     }), 404
 
 
-def _find_valid_date(api_prefix):
-    """Probe MOTIS with different dates to find one with active transit service."""
+def _find_valid_date(api_prefix, gtfs_info=None):
+    """Probe MOTIS with different dates to find one with active transit service.
+
+    Uses the GTFS date range (if available) to target the search, then falls
+    back to scanning around today.
+    """
     today = datetime.now(timezone.utc)
 
     def _has_service(dt):
@@ -189,19 +187,44 @@ def _find_valid_date(api_prefix):
             pass
         return False
 
-    # Quick check: today and a few nearby weekdays
-    for offset in [0, 1, 2, -1, -2]:
-        dt = today + timedelta(days=offset)
-        if dt.weekday() < 5 and _has_service(dt):
-            log.info(f"Found valid timetable date: {dt.date()}")
-            return dt.replace(hour=8, minute=0, second=0)
+    # If we know the GTFS range, start searching from its start date
+    gtfs_start = None
+    if gtfs_info and gtfs_info.get("overall_start"):
+        try:
+            s = gtfs_info["overall_start"]
+            gtfs_start = datetime(int(s[:4]), int(s[4:6]), int(s[6:8]), tzinfo=timezone.utc)
+        except (ValueError, IndexError):
+            pass
 
-    # Scan monthly increments backwards (up to 18 months)
+    # Build candidate dates: prefer dates within GTFS range near today
+    candidates = []
+
+    if gtfs_start and gtfs_start > today:
+        # Feed starts in the future — scan forward from its start
+        for offset in range(0, 14):
+            candidates.append(gtfs_start + timedelta(days=offset))
+
+    # Also try around today (both directions)
+    for offset in range(0, 14):
+        candidates.append(today + timedelta(days=offset))
+        if offset > 0:
+            candidates.append(today - timedelta(days=offset))
+
+    # Scan monthly backwards as last resort
     for months_back in range(1, 19):
         dt = today - timedelta(days=months_back * 30)
-        # Find next Tuesday from this date
+        # Snap to Tuesday
         while dt.weekday() != 1:
             dt += timedelta(days=1)
+        candidates.append(dt)
+
+    # Deduplicate while preserving order, skip weekends
+    seen = set()
+    for dt in candidates:
+        day_key = dt.date()
+        if day_key in seen or dt.weekday() >= 5:
+            continue
+        seen.add(day_key)
         if _has_service(dt):
             log.info(f"Found valid timetable date: {dt.date()}")
             return dt.replace(hour=8, minute=0, second=0)
