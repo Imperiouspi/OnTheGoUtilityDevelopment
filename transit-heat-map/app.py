@@ -67,12 +67,10 @@ def debug():
     if api:
         # Try a single test query near downtown Toronto
         test_url = f"{MOTIS_URL}{api}/plan"
-        now = datetime.now(timezone.utc)
         params = {
             "fromPlace": "43.6532,-79.3832",
             "toPlace": "43.7000,-79.4000",
-            "date": now.strftime("%Y-%m-%d"),
-            "time": now.strftime("%H:%M"),
+            "time": str(int(datetime.now(timezone.utc).timestamp())),
             "arriveBy": "false",
         }
         try:
@@ -94,14 +92,12 @@ def _detect_api_prefix():
     candidates = ["/api/v1", "/api/v2", "/api/v3", "/api/v4", "/api/v5", "/api"]
     for prefix in candidates:
         try:
-            now = datetime.now(timezone.utc)
             resp = requests.get(
                 f"{MOTIS_URL}{prefix}/plan",
                 params={
                     "fromPlace": "43.6532,-79.3832",
                     "toPlace": "43.6600,-79.3900",
-                    "date": now.strftime("%Y-%m-%d"),
-                    "time": now.strftime("%H:%M"),
+                    "time": str(int(datetime.now(timezone.utc).timestamp())),
                 },
                 timeout=10,
             )
@@ -132,25 +128,24 @@ def _generate_grid(grid_size):
 
 
 def _parse_depart_time(depart_time):
-    """Split a departure time string into separate date and time params for MOTIS."""
+    """Convert a departure time string to a Unix timestamp for MOTIS."""
     try:
         dt = datetime.fromisoformat(depart_time.replace("Z", "+00:00"))
     except (ValueError, AttributeError):
         dt = datetime.now(timezone.utc)
-    return dt.strftime("%Y-%m-%d"), dt.strftime("%H:%M")
+    return str(int(dt.timestamp()))
 
 
 def _query_single_route(from_lat, from_lng, to_lat, to_lng, depart_time, api_prefix):
     """Query MOTIS for a single origin -> destination route."""
     try:
-        date_str, time_str = _parse_depart_time(depart_time)
+        timestamp = _parse_depart_time(depart_time)
         resp = requests.get(
             f"{MOTIS_URL}{api_prefix}/plan",
             params={
                 "fromPlace": f"{from_lat},{from_lng}",
                 "toPlace": f"{to_lat},{to_lng}",
-                "date": date_str,
-                "time": time_str,
+                "time": timestamp,
                 "arriveBy": "false",
             },
             timeout=15,
@@ -189,12 +184,16 @@ def _query_travel_times(points, dest_lat, dest_lng, depart_time, api_prefix):
             )
             future_to_point[future] = (lat, lng)
 
+        failed = 0
         for future in concurrent.futures.as_completed(future_to_point):
             lat, lng = future_to_point[future]
             minutes = future.result()
             if minutes is not None:
                 results.append({"lat": lat, "lng": lng, "minutes": minutes})
+            else:
+                failed += 1
 
+    log.info(f"Heatmap query complete: {len(results)} succeeded, {failed} failed out of {len(points)} grid points")
     return results
 
 
