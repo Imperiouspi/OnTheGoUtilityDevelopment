@@ -1,4 +1,5 @@
 import concurrent.futures
+import logging
 import math
 from datetime import datetime, timezone
 
@@ -6,8 +7,11 @@ import requests
 from flask import Flask, jsonify, render_template, request
 
 app = Flask(__name__)
+logging.basicConfig(level=logging.INFO)
+log = logging.getLogger(__name__)
 
 MOTIS_URL = "http://localhost:8080"
+_api_prefix = None
 
 # Toronto bounding box
 TORONTO_BOUNDS = {
@@ -36,11 +40,75 @@ def heatmap():
     else:
         depart_time = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
+    api = _detect_api_prefix()
+    if not api:
+        return jsonify({"error": "Cannot reach MOTIS server"}), 502
+
     points = _generate_grid(grid_size)
 
-    results = _query_travel_times(points, dest_lat, dest_lng, depart_time)
+    results = _query_travel_times(points, dest_lat, dest_lng, depart_time, api)
 
     return jsonify(results)
+
+
+@app.route("/api/debug")
+def debug():
+    """Probe MOTIS to help diagnose connectivity issues."""
+    info = {"motis_url": MOTIS_URL, "api_prefix": _api_prefix}
+    try:
+        resp = requests.get(MOTIS_URL, timeout=5)
+        info["root_status"] = resp.status_code
+    except requests.RequestException as e:
+        info["root_error"] = str(e)
+
+    api = _detect_api_prefix()
+    info["detected_api"] = api
+
+    if api:
+        # Try a single test query near downtown Toronto
+        test_url = f"{MOTIS_URL}{api}/plan"
+        params = {
+            "fromPlace": "43.6532,-79.3832",
+            "toPlace": "43.7000,-79.4000",
+            "time": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+            "arriveBy": "false",
+        }
+        try:
+            resp = requests.get(test_url, params=params, timeout=15)
+            info["test_query_status"] = resp.status_code
+            info["test_query_response"] = resp.json()
+        except requests.RequestException as e:
+            info["test_query_error"] = str(e)
+
+    return jsonify(info)
+
+
+def _detect_api_prefix():
+    """Auto-detect which MOTIS API version is available."""
+    global _api_prefix
+    if _api_prefix is not None:
+        return _api_prefix
+
+    candidates = ["/api/v1", "/api/v2", "/api/v3", "/api/v4", "/api/v5", "/api"]
+    for prefix in candidates:
+        try:
+            resp = requests.get(
+                f"{MOTIS_URL}{prefix}/plan",
+                params={
+                    "fromPlace": "43.6532,-79.3832",
+                    "toPlace": "43.6600,-79.3900",
+                },
+                timeout=10,
+            )
+            if resp.status_code != 404:
+                _api_prefix = prefix
+                log.info(f"Detected MOTIS API prefix: {prefix} (status {resp.status_code})")
+                return _api_prefix
+        except requests.RequestException:
+            continue
+
+    log.warning("Could not detect MOTIS API version")
+    return None
 
 
 def _generate_grid(grid_size):
@@ -58,18 +126,18 @@ def _generate_grid(grid_size):
     return points
 
 
-def _query_single_route(from_lat, from_lng, to_lat, to_lng, depart_time):
+def _query_single_route(from_lat, from_lng, to_lat, to_lng, depart_time, api_prefix):
     """Query MOTIS for a single origin -> destination route."""
     try:
         resp = requests.get(
-            f"{MOTIS_URL}/api/v1/plan",
+            f"{MOTIS_URL}{api_prefix}/plan",
             params={
                 "fromPlace": f"{from_lat},{from_lng}",
                 "toPlace": f"{to_lat},{to_lng}",
                 "time": depart_time,
                 "arriveBy": "false",
             },
-            timeout=10,
+            timeout=15,
         )
         if resp.status_code != 200:
             return None
@@ -88,7 +156,7 @@ def _query_single_route(from_lat, from_lng, to_lat, to_lng, depart_time):
         return None
 
 
-def _query_travel_times(points, dest_lat, dest_lng, depart_time):
+def _query_travel_times(points, dest_lat, dest_lng, depart_time, api_prefix):
     """Query travel times from all grid points to the destination in parallel."""
     results = []
 
@@ -101,7 +169,7 @@ def _query_travel_times(points, dest_lat, dest_lng, depart_time):
                 continue
 
             future = executor.submit(
-                _query_single_route, lat, lng, dest_lat, dest_lng, depart_time
+                _query_single_route, lat, lng, dest_lat, dest_lng, depart_time, api_prefix
             )
             future_to_point[future] = (lat, lng)
 
