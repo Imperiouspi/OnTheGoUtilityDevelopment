@@ -162,8 +162,8 @@ def timetable_dates():
 def _find_valid_date(api_prefix, gtfs_info=None):
     """Probe MOTIS with different dates to find one with active transit service.
 
-    Uses the GTFS date range (if available) to target the search, then falls
-    back to scanning around today.
+    Only probes dates within the GTFS feed's service range to avoid MOTIS
+    VERIFY FAIL errors for out-of-window dates.
     """
     today = datetime.now(timezone.utc)
 
@@ -187,38 +187,44 @@ def _find_valid_date(api_prefix, gtfs_info=None):
             pass
         return False
 
-    # If we know the GTFS range, start searching from its start date
+    # Parse GTFS date boundaries so we only probe valid dates
     gtfs_start = None
-    if gtfs_info and gtfs_info.get("overall_start"):
-        try:
-            s = gtfs_info["overall_start"]
-            gtfs_start = datetime(int(s[:4]), int(s[4:6]), int(s[6:8]), tzinfo=timezone.utc)
-        except (ValueError, IndexError):
-            pass
+    gtfs_end = None
+    if gtfs_info:
+        for key, target in [("overall_start", "start"), ("overall_end", "end")]:
+            s = gtfs_info.get(key)
+            if s:
+                try:
+                    dt = datetime(int(s[:4]), int(s[4:6]), int(s[6:8]), tzinfo=timezone.utc)
+                    if target == "start":
+                        gtfs_start = dt
+                    else:
+                        gtfs_end = dt
+                except (ValueError, IndexError):
+                    pass
 
-    # Build candidate dates: prefer dates within GTFS range near today
+    # Determine the search window — only probe dates the GTFS feed covers
+    search_start = gtfs_start or today - timedelta(days=30)
+    search_end = gtfs_end or today + timedelta(days=30)
+
+    # Start from whichever is later: today or the feed start
+    probe_start = max(today, search_start)
+
+    # Scan forward from probe_start through the end of the feed
     candidates = []
-
-    if gtfs_start and gtfs_start > today:
-        # Feed starts in the future — scan forward from its start
-        for offset in range(0, 14):
-            candidates.append(gtfs_start + timedelta(days=offset))
-
-    # Also try around today (both directions)
-    for offset in range(0, 14):
-        candidates.append(today + timedelta(days=offset))
-        if offset > 0:
-            candidates.append(today - timedelta(days=offset))
-
-    # Scan monthly backwards as last resort
-    for months_back in range(1, 19):
-        dt = today - timedelta(days=months_back * 30)
-        # Snap to Tuesday
-        while dt.weekday() != 1:
-            dt += timedelta(days=1)
+    dt = probe_start
+    while dt <= search_end:
         candidates.append(dt)
+        dt += timedelta(days=1)
 
-    # Deduplicate while preserving order, skip weekends
+    # Also scan backwards from today to feed start (if today is within range)
+    if today > search_start:
+        dt = today - timedelta(days=1)
+        while dt >= search_start:
+            candidates.append(dt)
+            dt -= timedelta(days=1)
+
+    # Deduplicate, skip weekends
     seen = set()
     for dt in candidates:
         day_key = dt.date()
