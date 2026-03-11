@@ -22,6 +22,12 @@ Uses a self-hosted [MOTIS](https://github.com/motis-project/motis) instance (the
 
 ### 1. Download transit data
 
+**Windows:**
+```cmd
+setup.bat
+```
+
+**Linux/macOS:**
 ```bash
 chmod +x setup.sh
 ./setup.sh
