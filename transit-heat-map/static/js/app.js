@@ -27,15 +27,37 @@ const pinCoordsEl = document.getElementById("pin-coords");
 const gridSizeEl = document.getElementById("grid-size");
 const departTimeEl = document.getElementById("depart-time");
 
-// Set default departure time to next weekday 8:00 AM
-const now = new Date();
-const nextDay = new Date(now);
-nextDay.setDate(now.getDate() + 1);
-while (nextDay.getDay() === 0 || nextDay.getDay() === 6) {
-  nextDay.setDate(nextDay.getDate() + 1);
-}
-nextDay.setHours(8, 0, 0, 0);
-departTimeEl.value = nextDay.toISOString().slice(0, 16);
+// Auto-detect valid timetable date from MOTIS, fall back to next weekday 8 AM
+(async function setDefaultDepartTime() {
+  try {
+    const resp = await fetch("/api/timetable-dates");
+    if (resp.ok) {
+      const data = await resp.json();
+      if (data.suggested_time) {
+        departTimeEl.value = data.suggested_time;
+        statusEl.className = "success";
+        statusEl.textContent = `MOTIS timetable active for ${data.valid_date}. Click the map to set a destination.`;
+        statusEl.classList.remove("hidden");
+        return;
+      }
+    }
+  } catch (e) {
+    // Fall through to default
+  }
+  // Fallback: next weekday 8:00 AM
+  const now = new Date();
+  const nextDay = new Date(now);
+  nextDay.setDate(now.getDate() + 1);
+  while (nextDay.getDay() === 0 || nextDay.getDay() === 6) {
+    nextDay.setDate(nextDay.getDate() + 1);
+  }
+  nextDay.setHours(8, 0, 0, 0);
+  departTimeEl.value = nextDay.toISOString().slice(0, 16);
+  statusEl.className = "error";
+  statusEl.textContent =
+    "Warning: Could not detect valid timetable dates. The GTFS feed may not cover the selected date. Try re-importing MOTIS with fresh TTC data.";
+  statusEl.classList.remove("hidden");
+})();
 
 // Pin icon
 const pinIcon = L.divIcon({
@@ -103,9 +125,11 @@ generateBtn.addEventListener("click", async function () {
 
     const points = await resp.json();
 
-    if (points.length === 0) {
+    if (points.length === 0 || points.length <= 2) {
       statusEl.className = "error";
-      statusEl.textContent = "No routes found. Is the MOTIS server running with TTC data?";
+      statusEl.textContent =
+        "No transit routes found. The GTFS feed likely doesn't cover the selected date/time. " +
+        "Try re-running setup.sh to download fresh TTC data, then re-import MOTIS.";
       generateBtn.disabled = false;
       return;
     }

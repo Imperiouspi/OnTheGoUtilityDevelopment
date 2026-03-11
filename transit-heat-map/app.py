@@ -1,7 +1,7 @@
 import concurrent.futures
 import logging
 import math
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 import requests
 from flask import Flask, jsonify, render_template, request
@@ -49,6 +49,66 @@ def heatmap():
     results = _query_travel_times(points, dest_lat, dest_lng, depart_time, api)
 
     return jsonify(results)
+
+
+@app.route("/api/timetable-dates")
+def timetable_dates():
+    """Probe MOTIS to discover the valid timetable date range."""
+    api = _detect_api_prefix()
+    if not api:
+        return jsonify({"error": "Cannot reach MOTIS server"}), 502
+
+    valid_date = _find_valid_date(api)
+    if valid_date:
+        return jsonify({
+            "valid_date": valid_date.strftime("%Y-%m-%d"),
+            "suggested_time": valid_date.strftime("%Y-%m-%dT08:00"),
+        })
+    return jsonify({"error": "No valid timetable dates found in MOTIS"}), 404
+
+
+def _find_valid_date(api_prefix):
+    """Probe MOTIS with different dates to find one with active transit service."""
+    today = datetime.now(timezone.utc)
+
+    def _has_service(dt):
+        """Check if MOTIS has transit service on the given date at 8 AM."""
+        test_time = dt.replace(hour=8, minute=0, second=0)
+        try:
+            resp = requests.get(
+                f"{MOTIS_URL}{api_prefix}/plan",
+                params={
+                    "fromPlace": "43.6532,-79.3832",
+                    "toPlace": "43.7000,-79.4000",
+                    "time": test_time.strftime("%Y-%m-%dT%H:%M:%SZ"),
+                    "arriveBy": "false",
+                },
+                timeout=10,
+            )
+            if resp.status_code == 200:
+                return bool(resp.json().get("itineraries"))
+        except requests.RequestException:
+            pass
+        return False
+
+    # Quick check: today and a few nearby weekdays
+    for offset in [0, 1, 2, -1, -2]:
+        dt = today + timedelta(days=offset)
+        if dt.weekday() < 5 and _has_service(dt):
+            log.info(f"Found valid timetable date: {dt.date()}")
+            return dt.replace(hour=8, minute=0, second=0)
+
+    # Scan monthly increments backwards (up to 18 months)
+    for months_back in range(1, 19):
+        dt = today - timedelta(days=months_back * 30)
+        # Find next Tuesday from this date
+        while dt.weekday() != 1:
+            dt += timedelta(days=1)
+        if _has_service(dt):
+            log.info(f"Found valid timetable date: {dt.date()}")
+            return dt.replace(hour=8, minute=0, second=0)
+
+    return None
 
 
 @app.route("/api/debug")

@@ -6,7 +6,7 @@ osm: /data/toronto.osm.pbf
 
 timetable:
   first_day: TODAY
-  num_days: 7
+  num_days: 365
   datasets:
     ttc:
       path: /data/ttc-gtfs.zip
