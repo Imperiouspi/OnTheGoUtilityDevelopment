@@ -27,12 +27,14 @@ const pinCoordsEl = document.getElementById("pin-coords");
 const gridSizeEl = document.getElementById("grid-size");
 const departTimeEl = document.getElementById("depart-time");
 
-// Auto-detect valid timetable date from MOTIS, fall back to next weekday 8 AM
+// Auto-detect valid timetable date from MOTIS, fall back to GTFS start or next weekday 8 AM
 (async function setDefaultDepartTime() {
   let errorDetail = "";
+  let gtfsInfo = null;
   try {
     const resp = await fetch("/api/timetable-dates");
     const data = await resp.json();
+    gtfsInfo = data.gtfs_info;
     if (resp.ok && data.suggested_time) {
       departTimeEl.value = data.suggested_time;
       const range = data.gtfs_info?.service_range || data.valid_date;
@@ -45,15 +47,19 @@ const departTimeEl = document.getElementById("depart-time");
   } catch (e) {
     errorDetail = `Could not reach Flask server: ${e.message}`;
   }
-  // Fallback: next weekday 8:00 AM
-  const now = new Date();
-  const nextDay = new Date(now);
-  nextDay.setDate(now.getDate() + 1);
-  while (nextDay.getDay() === 0 || nextDay.getDay() === 6) {
-    nextDay.setDate(nextDay.getDate() + 1);
+  // Fallback: use GTFS start date if available, otherwise next weekday
+  let fallback = new Date();
+  fallback.setDate(fallback.getDate() + 1);
+  const gs = gtfsInfo?.overall_start;
+  if (gs && gs.length === 8) {
+    const parsed = new Date(`${gs.slice(0,4)}-${gs.slice(4,6)}-${gs.slice(6,8)}T08:00:00`);
+    if (!isNaN(parsed) && parsed > new Date()) fallback = parsed;
   }
-  nextDay.setHours(8, 0, 0, 0);
-  departTimeEl.value = nextDay.toISOString().slice(0, 16);
+  while (fallback.getDay() === 0 || fallback.getDay() === 6) {
+    fallback.setDate(fallback.getDate() + 1);
+  }
+  fallback.setHours(8, 0, 0, 0);
+  departTimeEl.value = fallback.toISOString().slice(0, 16);
   statusEl.className = "error";
   statusEl.textContent = errorDetail;
   statusEl.classList.remove("hidden");

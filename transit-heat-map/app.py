@@ -43,7 +43,14 @@ def heatmap():
     if time_str:
         depart_time = time_str
     else:
-        depart_time = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+        # Default to a date within the GTFS feed range at 8 AM
+        gtfs = _read_gtfs_date_range()
+        api_tmp = _detect_api_prefix()
+        valid = _find_valid_date(api_tmp, gtfs) if api_tmp else None
+        if valid:
+            depart_time = valid.strftime("%Y-%m-%dT%H:%M:%SZ")
+        else:
+            depart_time = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
     api = _detect_api_prefix()
     if not api:
@@ -160,34 +167,15 @@ def timetable_dates():
 
 
 def _find_valid_date(api_prefix, gtfs_info=None):
-    """Probe MOTIS with different dates to find one with active transit service.
+    """Find the best default departure date from the GTFS feed's service range.
 
-    Only probes dates within the GTFS feed's service range to avoid MOTIS
-    VERIFY FAIL errors for out-of-window dates.
+    Uses the GTFS date range directly rather than probing MOTIS for routes,
+    since route probes can return empty itineraries even when service exists
+    (e.g. if the test coordinates aren't near transit stops).
     """
     today = datetime.now(timezone.utc)
 
-    def _has_service(dt):
-        """Check if MOTIS has transit service on the given date at 8 AM."""
-        test_time = dt.replace(hour=8, minute=0, second=0)
-        try:
-            resp = requests.get(
-                f"{MOTIS_URL}{api_prefix}/plan",
-                params={
-                    "fromPlace": "43.6532,-79.3832",
-                    "toPlace": "43.7000,-79.4000",
-                    "time": test_time.strftime("%Y-%m-%dT%H:%M:%SZ"),
-                    "arriveBy": "false",
-                },
-                timeout=10,
-            )
-            if resp.status_code == 200:
-                return bool(resp.json().get("itineraries"))
-        except requests.RequestException:
-            pass
-        return False
-
-    # Parse GTFS date boundaries so we only probe valid dates
+    # Parse GTFS date boundaries
     gtfs_start = None
     gtfs_end = None
     if gtfs_info:
@@ -203,37 +191,19 @@ def _find_valid_date(api_prefix, gtfs_info=None):
                 except (ValueError, IndexError):
                     pass
 
-    # Determine the search window — only probe dates the GTFS feed covers
-    search_start = gtfs_start or today - timedelta(days=30)
-    search_end = gtfs_end or today + timedelta(days=30)
+    if not gtfs_start:
+        return None
 
-    # Start from whichever is later: today or the feed start
-    probe_start = max(today, search_start)
+    # Pick the first weekday at-or-after whichever is later: today or feed start
+    candidate = max(today, gtfs_start)
+    # Cap to feed end if known
+    end = gtfs_end or (candidate + timedelta(days=365))
 
-    # Scan forward from probe_start through the end of the feed
-    candidates = []
-    dt = probe_start
-    while dt <= search_end:
-        candidates.append(dt)
-        dt += timedelta(days=1)
-
-    # Also scan backwards from today to feed start (if today is within range)
-    if today > search_start:
-        dt = today - timedelta(days=1)
-        while dt >= search_start:
-            candidates.append(dt)
-            dt -= timedelta(days=1)
-
-    # Deduplicate, skip weekends
-    seen = set()
-    for dt in candidates:
-        day_key = dt.date()
-        if day_key in seen or dt.weekday() >= 5:
-            continue
-        seen.add(day_key)
-        if _has_service(dt):
-            log.info(f"Found valid timetable date: {dt.date()}")
-            return dt.replace(hour=8, minute=0, second=0)
+    while candidate <= end:
+        if candidate.weekday() < 5:  # skip weekends
+            log.info(f"Using timetable date: {candidate.date()}")
+            return candidate.replace(hour=8, minute=0, second=0)
+        candidate += timedelta(days=1)
 
     return None
 
@@ -252,12 +222,17 @@ def debug():
     info["detected_api"] = api
 
     if api:
-        # Try a single test query near downtown Toronto
+        # Use a date within the GTFS range for the test query
+        gtfs = _read_gtfs_date_range()
+        valid = _find_valid_date(api, gtfs)
+        test_time = valid.strftime("%Y-%m-%dT%H:%M:%SZ") if valid else _to_motis_time()
+        info["test_query_time"] = test_time
+
         test_url = f"{MOTIS_URL}{api}/plan"
         params = {
             "fromPlace": "43.6532,-79.3832",
             "toPlace": "43.7000,-79.4000",
-            "time": _to_motis_time(),
+            "time": test_time,
             "arriveBy": "false",
         }
         try:
